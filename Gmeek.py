@@ -313,14 +313,24 @@ class GMEEK():
 
 
     def addOnePostJson(self,issue):
+        # [MODIFIED] Moved postConfig parsing to the top
+        try:
+            postConfig=json.loads(issue.body.split("\r\n")[-1:][0].split("##")[1])
+            print("Has Custom JSON parameters")
+            print(postConfig)
+        except:
+            postConfig={}
+
         if len(issue.labels)>=1:
             if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
                 listJsonName='singeListJson'
-                htmlFile='{}.html'.format(self.createFileName(issue,useLabel=True))
+                # [MODIFIED] Pass postConfig to createFileName
+                htmlFile='{}.html'.format(self.createFileName(issue,postConfig,useLabel=True))
                 gen_Html = self.root_dir+htmlFile
             else:
                 listJsonName='postListJson'
-                htmlFile='{}.html'.format(self.createFileName(issue))
+                # [MODIFIED] Pass postConfig to createFileName
+                htmlFile='{}.html'.format(self.createFileName(issue,postConfig))
                 gen_Html = self.post_dir+htmlFile
 
             postNum="P"+str(issue.number)
@@ -353,13 +363,13 @@ class GMEEK():
                     self.blogBase[listJsonName][postNum]["top"]=1
                 elif event.event=="unpinned":
                     self.blogBase[listJsonName][postNum]["top"]=0
-
-            try:
-                postConfig=json.loads(issue.body.split("\r\n")[-1:][0].split("##")[1])
-                print("Has Custom JSON parameters")
-                print(postConfig)
-            except:
-                postConfig={}
+            
+            # This try-except block is now at the top of the function
+            # try:
+            #     postConfig=json.loads(issue.body.split("\r\n")[-1:][0].split("##")[1])
+            #     ...
+            # except:
+            #     postConfig={}
 
             if "timestamp" in postConfig:
                 self.blogBase[listJsonName][postNum]["createdAt"]=postConfig["timestamp"]
@@ -432,11 +442,14 @@ class GMEEK():
         else:
             print("====== issue is closed ======")
 
-    def createFileName(self,issue,useLabel=False):
+    # [MODIFIED] Added postConfig parameter and logic to check for 'slug'
+    def createFileName(self,issue,postConfig={},useLabel=False):
         if useLabel==True:
             fileName=issue.labels[0].name
         else:
-            if self.blogBase["urlMode"]=="issue":
+            if "slug" in postConfig:
+                fileName=postConfig["slug"]
+            elif self.blogBase["urlMode"]=="issue":
                 fileName=str(issue.number)
             elif self.blogBase["urlMode"]=="ru_translit": 
                 fileName=str(translit(issue.title, language_code='ru', reversed=True)).replace(' ', '-')
