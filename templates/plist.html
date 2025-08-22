@@ -59,13 +59,15 @@
         </svg>
     </a>
     {%- endfor %}
-    {% for num in blogBase['singeListJson'] -%}
-    <a href="{{ blogBase['homeUrl'] }}/{{ blogBase['singeListJson'][num]['labels'][0] }}.html" class="btn btn-invisible circle" title="{{ blogBase['singeListJson'][num]['postTitle'] }}">
-        <svg class="octicon" width="16" height="16" >
-            <path id="{{ blogBase['singeListJson'][num]['postTitle'] }}" fill-rule="evenodd"></path>
-        </svg>
-    </a>
-    {%- endfor %}
+    {%- for num in blogBase['singeListJson'] %}
+    {%- if blogBase['singeListJson'][num]['labels'][0] in blogBase['singlePage'] %}
+    <a href="{{ blogBase['homeUrl'] }}/{{ blogBase['singeListJson'][num]['labels'][0] }}.html" class="btn btn-invisible circle" title="{{ blogBase['singeListJson'][num]['postTitle'] }}">
+        <svg class="octicon" width="16" height="16" >
+            <path id="{{ blogBase['singeListJson'][num]['postTitle'] }}" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    {%- endif %}
+    {%- endfor %}
     <a href="{{ blogBase['homeUrl'] }}/rss.xml" target="_blank" id="buttonRSS" class="btn btn-invisible circle" title="RSS">
         <svg class="octicon" width="16" height="16" >
             <path id="pathRSS" fill-rule="evenodd"></path>
@@ -138,7 +140,9 @@ document.getElementById("{{ key }}").setAttribute("d",value=IconList["{{ key }}"
 {%- endfor %}
 
 {% for num in blogBase['singeListJson'] -%}
+{% if blogBase['singeListJson'][num]['labels'][0] in blogBase['singlePage'] %}
 document.getElementById("{{ blogBase['singeListJson'][num]['postTitle'] }}").setAttribute("d",value=IconList["{{ blogBase['singeListJson'][num]['labels'][0] }}"]);
+{% endif -%}
 {%- endfor %}
 </script>
 {{ blogBase['indexScript'] }}
