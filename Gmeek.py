@@ -311,12 +311,13 @@ class GMEEK():
         print("====== create rss xml ======")
         feed.rss_file(self.root_dir+'rss.xml')
 
+
     def addOnePostJson(self,issue):
-    if len(issue.labels)>=1:
-        if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
-            listJsonName='singeListJson'
-            htmlFile='{}.html'.format(self.createFileName(issue,useLabel=True))
-            gen_Html = self.root_dir+htmlFile
+        if len(issue.labels)>=1:
+            if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
+                listJsonName='singeListJson'
+                htmlFile='{}.html'.format(self.createFileName(issue,useLabel=True))
+                gen_Html = self.root_dir+htmlFile
             else:
                 listJsonName='postListJson'
                 htmlFile='{}.html'.format(self.createFileName(issue))
@@ -400,7 +401,7 @@ class GMEEK():
                 f.write(issue.body)
             f.close()
             return listJsonName
-
+            
     def runAll(self):
         print("====== start create static html ======")
         self.cleanFile()
