@@ -88,7 +88,7 @@ class GMEEK():
             print("static does not exist")
 
     def defaultConfig(self):
-        dconfig={"singlePage":[],"startSite":"","filingNum":"","onePageListNum":15,"commentLabelColor":"#006b75","yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"],"i18n":"CN","themeMode":"manual","dayTheme":"light","nightTheme":"dark","urlMode":"pinyin","script":"","style":"","head":"","indexScript":"","indexStyle":"","bottomText":"","showPostSource":1,"iconList":{},"UTC":+8,"rssSplit":"sentence","exlink":{},"needComment":1,"allHead":""}
+        dconfig={"singlePage":[],"hiddenPage":[],"startSite":"","filingNum":"","onePageListNum":15,"commentLabelColor":"#006b75","yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"],"i18n":"CN","themeMode":"manual","dayTheme":"light","nightTheme":"dark","urlMode":"pinyin","script":"","style":"","head":"","indexScript":"","indexStyle":"","bottomText":"","showPostSource":1,"iconList":{},"UTC":+8,"rssSplit":"sentence","exlink":{},"needComment":1,"allHead":""}
         config=json.loads(open('config.json', 'r', encoding='utf-8').read())
         self.blogBase={**dconfig,**config}.copy()
         self.blogBase["postListJson"]=json.loads('{}')
@@ -312,11 +312,11 @@ class GMEEK():
         feed.rss_file(self.root_dir+'rss.xml')
 
     def addOnePostJson(self,issue):
-        if len(issue.labels)>=1:
-            if issue.labels[0].name in self.blogBase["singlePage"]:
-                listJsonName='singeListJson'
-                htmlFile='{}.html'.format(self.createFileName(issue,useLabel=True))
-                gen_Html = self.root_dir+htmlFile
+    if len(issue.labels)>=1:
+        if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
+            listJsonName='singeListJson'
+            htmlFile='{}.html'.format(self.createFileName(issue,useLabel=True))
+            gen_Html = self.root_dir+htmlFile
             else:
                 listJsonName='postListJson'
                 htmlFile='{}.html'.format(self.createFileName(issue))
