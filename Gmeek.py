@@ -313,10 +313,9 @@ class GMEEK():
 
 
     def addOnePostJson(self,issue):
-        # [MODIFIED] Moved postConfig parsing to the top
 # --- [新增] 使用更强大的逻辑来解析自定义配置，忽略末尾空行 ---
-    postConfig = {}
-    if issue.body: # 确保 issue.body 不是 None
+        postConfig = {}
+       if issue.body: # 确保 issue.body 不是 None
         lines = issue.body.splitlines()
         # 从后往前遍历，找到最后一个非空行
         last_meaningful_line = ""
