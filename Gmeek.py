@@ -178,6 +178,7 @@ class GMEEK():
                     )
 
         if '<code class="notranslate">Gmeek-html' in post_body:
+            post_body = re.sub(r'<code class="notranslate">Gmeek-html(.*?)</code>', lambda match: html.unescape(match.group(1)), p
             post_body = re.sub(r'<code class="notranslate">Gmeek-html(.*?)</code>', lambda match: html.unescape(match.group(1)), post_body, flags=re.DOTALL)
 
         postBase["postTitle"]=issue["postTitle"]
@@ -310,116 +311,115 @@ class GMEEK():
 
         print("====== create rss xml ======")
         feed.rss_file(self.root_dir+'rss.xml')
-
-def addOnePostJson(self,issue):
-    # --- [关键修改] 使用更强大的逻辑来解析自定义配置，忽略末尾空行 ---
-    postConfig = {}
-    if issue.body: # 确保 issue.body 不是 None
-        lines = issue.body.splitlines()
-        # 从后往前遍历，找到最后一个非空行
-        last_meaningful_line = ""
-        for line in reversed(lines):
-            stripped_line = line.strip()
-            if stripped_line:
-                last_meaningful_line = stripped_line
-                break
-
-        if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
-            try:
-                # 移除开头的 '##'
-                json_str = last_meaningful_line[2:]
-                postConfig = json.loads(json_str)
-                print("Has Custom JSON parameters")
-                print(postConfig)
-            except json.JSONDecodeError as e:
-                print(f"[ERROR] Failed to parse JSON from the last line. Error: {e}")
-                print(f"[ERROR] The problematic line is: {last_meaningful_line}")
-                postConfig = {} # 解析失败则重置
-        else:
-            # 为了调试，我们打印出最后一行，看看为什么它不匹配
-            print(f"Debug: Last meaningful line does not match format '##{{...}}'. Line is: '{last_meaningful_line}'")
-
-    if len(issue.labels)>=1:
-        if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
-            listJsonName='singeListJson'
-            htmlFile='{}.html'.format(self.createFileName(issue,postConfig,useLabel=True))
-            gen_Html = self.root_dir+htmlFile
-        else:
-            listJsonName='postListJson'
-            htmlFile='{}.html'.format(self.createFileName(issue,postConfig))
-            gen_Html = self.post_dir+htmlFile
-
-        postNum="P"+str(issue.number)
-        self.blogBase[listJsonName][postNum]=json.loads('{}')
-        self.blogBase[listJsonName][postNum]["htmlDir"]=gen_Html
-        self.blogBase[listJsonName][postNum]["labels"]=[label.name for label in issue.labels]
-        self.blogBase[listJsonName][postNum]["postTitle"]=issue.title
-        self.blogBase[listJsonName][postNum]["postUrl"]=urllib.parse.quote(gen_Html[len(self.root_dir):])
-
-        self.blogBase[listJsonName][postNum]["postSourceUrl"]="https://github.com/"+options.repo_name+"/issues/"+str(issue.number)
-        self.blogBase[listJsonName][postNum]["commentNum"]=issue.get_comments().totalCount
-
-        if issue.body==None:
-            self.blogBase[listJsonName][postNum]["description"]=''
-            self.blogBase[listJsonName][postNum]["wordCount"]=0
-        else:
-            self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
-            if self.blogBase["rssSplit"]=="sentence":
-                if self.blogBase["i18n"]=="CN":
-                    period="。"
-                else:
-                    period="."
+    def addOnePostJson(self,issue):
+        # 使用更强大的逻辑来解析自定义配置，忽略末尾空行
+        postConfig = {}
+        if issue.body: # 确保 issue.body 不是 None
+            lines = issue.body.splitlines()
+            # 从后往前遍历，找到最后一个非空行
+            last_meaningful_line = ""
+            for line in reversed(lines):
+                stripped_line = line.strip()
+                if stripped_line:
+                    last_meaningful_line = stripped_line
+                    break
+            
+            if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
+                try:
+                    # 移除开头的 '##'
+                    json_str = last_meaningful_line[2:]
+                    postConfig = json.loads(json_str)
+                    print("Has Custom JSON parameters")
+                    print(postConfig)
+                except json.JSONDecodeError as e:
+                    print(f"[ERROR] Failed to parse JSON from the last line. Error: {e}")
+                    print(f"[ERROR] The problematic line is: {last_meaningful_line}")
+                    postConfig = {} # 解析失败则重置
             else:
-                period=self.blogBase["rssSplit"]
-            self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
+                # 为了调试，我们打印出最后一行，看看为什么它不匹配
+                print(f"Debug: Last meaningful line does not match format '##{{...}}'. Line is: '{last_meaningful_line}'")
 
-        self.blogBase[listJsonName][postNum]["top"]=0
-        for event in issue.get_events():
-            if event.event=="pinned":
-                self.blogBase[listJsonName][postNum]["top"]=1
-            elif event.event=="unpinned":
-                self.blogBase[listJsonName][postNum]["top"]=0
+        if len(issue.labels)>=1:
+            if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
+                listJsonName='singeListJson'
+                htmlFile='{}.html'.format(self.createFileName(issue,postConfig,useLabel=True))
+                gen_Html = self.root_dir+htmlFile
+            else:
+                listJsonName='postListJson'
+                htmlFile='{}.html'.format(self.createFileName(issue,postConfig))
+                gen_Html = self.post_dir+htmlFile
 
-        if "timestamp" in postConfig:
-            self.blogBase[listJsonName][postNum]["createdAt"]=postConfig["timestamp"]
-        else:
-            self.blogBase[listJsonName][postNum]["createdAt"]=int(time.mktime(issue.created_at.timetuple()))
+            postNum="P"+str(issue.number)
+            self.blogBase[listJsonName][postNum]=json.loads('{}')
+            self.blogBase[listJsonName][postNum]["htmlDir"]=gen_Html
+            self.blogBase[listJsonName][postNum]["labels"]=[label.name for label in issue.labels]
+            self.blogBase[listJsonName][postNum]["postTitle"]=issue.title
+            self.blogBase[listJsonName][postNum]["postUrl"]=urllib.parse.quote(gen_Html[len(self.root_dir):])
 
-        if "style" in postConfig:
-            self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]+str(postConfig["style"])
-        else:
-            self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]
+            self.blogBase[listJsonName][postNum]["postSourceUrl"]="https://github.com/"+options.repo_name+"/issues/"+str(issue.number)
+            self.blogBase[listJsonName][postNum]["commentNum"]=issue.get_comments().totalCount
 
-        if "script" in postConfig:
-            self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]+str(postConfig["script"])
-        else:
-            self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]
+            if issue.body==None:
+                self.blogBase[listJsonName][postNum]["description"]=''
+                self.blogBase[listJsonName][postNum]["wordCount"]=0
+            else:
+                self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
+                if self.blogBase["rssSplit"]=="sentence":
+                    if self.blogBase["i18n"]=="CN":
+                        period="。"
+                    else:
+                        period="."
+                else:
+                    period=self.blogBase["rssSplit"]
+                self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
+                
+            self.blogBase[listJsonName][postNum]["top"]=0
+            for event in issue.get_events():
+                if event.event=="pinned":
+                    self.blogBase[listJsonName][postNum]["top"]=1
+                elif event.event=="unpinned":
+                    self.blogBase[listJsonName][postNum]["top"]=0
 
-        if "head" in postConfig:
-            self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]+str(postConfig["head"])
-        else:
-            self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]
+            if "timestamp" in postConfig:
+                self.blogBase[listJsonName][postNum]["createdAt"]=postConfig["timestamp"]
+            else:
+                self.blogBase[listJsonName][postNum]["createdAt"]=int(time.mktime(issue.created_at.timetuple()))
+            
+            if "style" in postConfig:
+                self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]+str(postConfig["style"])
+            else:
+                self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]
 
-        if "ogImage" in postConfig:
-            self.blogBase[listJsonName][postNum]["ogImage"]=postConfig["ogImage"]
-        else:
-            self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
+            if "script" in postConfig:
+                self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]+str(postConfig["script"])
+            else:
+                self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]
 
-        thisTime=datetime.datetime.fromtimestamp(self.blogBase[listJsonName][postNum]["createdAt"])
-        thisTime=thisTime.astimezone(self.TZ)
-        thisYear=thisTime.year
-        self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
-        self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
+            if "head" in postConfig:
+                self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]+str(postConfig["head"])
+            else:
+                self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]
 
-        mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
-        f = open(self.backup_dir+mdFileName+".md", 'w', encoding='UTF-8')
+            if "ogImage" in postConfig:
+                self.blogBase[listJsonName][postNum]["ogImage"]=postConfig["ogImage"]
+            else:
+                self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
 
-        if issue.body==None:
-            f.write('')
-        else:
-            f.write(issue.body)
-        f.close()
-        return listJsonName
+            thisTime=datetime.datetime.fromtimestamp(self.blogBase[listJsonName][postNum]["createdAt"])
+            thisTime=thisTime.astimezone(self.TZ)
+            thisYear=thisTime.year
+            self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
+            self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
+
+            mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
+            f = open(self.backup_dir+mdFileName+".md", 'w', encoding='UTF-8')
+            
+            if issue.body==None:
+                f.write('')
+            else:
+                f.write(issue.body)
+            f.close()
+            return listJsonName
             
     def runAll(self):
         print("====== start create static html ======")
@@ -451,7 +451,6 @@ def addOnePostJson(self,issue):
         else:
             print("====== issue is closed ======")
 
-    # [MODIFIED] Added postConfig parameter and logic to check for 'slug'
     def createFileName(self,issue,postConfig={},useLabel=False):
         if useLabel==True:
             fileName=issue.labels[0].name
