@@ -313,9 +313,9 @@ class GMEEK():
 
 
     def addOnePostJson(self,issue):
-# --- [新增] 使用更强大的逻辑来解析自定义配置，忽略末尾空行 ---
-        postConfig = {}
-       if issue.body: # 确保 issue.body 不是 None
+    # --- [关键修改] 使用更强大的逻辑来解析自定义配置，忽略末尾空行 ---
+    postConfig = {}
+    if issue.body: # 确保 issue.body 不是 None
         lines = issue.body.splitlines()
         # 从后往前遍历，找到最后一个非空行
         last_meaningful_line = ""
@@ -340,96 +340,87 @@ class GMEEK():
             # 为了调试，我们打印出最后一行，看看为什么它不匹配
             print(f"Debug: Last meaningful line does not match format '##{{...}}'. Line is: '{last_meaningful_line}'")
 
-        if len(issue.labels)>=1:
-            if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
-                listJsonName='singeListJson'
-                # [MODIFIED] Pass postConfig to createFileName
-                htmlFile='{}.html'.format(self.createFileName(issue,postConfig,useLabel=True))
-                gen_Html = self.root_dir+htmlFile
-            else:
-                listJsonName='postListJson'
-                # [MODIFIED] Pass postConfig to createFileName
-                htmlFile='{}.html'.format(self.createFileName(issue,postConfig))
-                gen_Html = self.post_dir+htmlFile
+    if len(issue.labels)>=1:
+        if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
+            listJsonName='singeListJson'
+            htmlFile='{}.html'.format(self.createFileName(issue,postConfig,useLabel=True))
+            gen_Html = self.root_dir+htmlFile
+        else:
+            listJsonName='postListJson'
+            htmlFile='{}.html'.format(self.createFileName(issue,postConfig))
+            gen_Html = self.post_dir+htmlFile
 
-            postNum="P"+str(issue.number)
-            self.blogBase[listJsonName][postNum]=json.loads('{}')
-            self.blogBase[listJsonName][postNum]["htmlDir"]=gen_Html
-            self.blogBase[listJsonName][postNum]["labels"]=[label.name for label in issue.labels]
-            self.blogBase[listJsonName][postNum]["postTitle"]=issue.title
-            self.blogBase[listJsonName][postNum]["postUrl"]=urllib.parse.quote(gen_Html[len(self.root_dir):])
+        postNum="P"+str(issue.number)
+        self.blogBase[listJsonName][postNum]=json.loads('{}')
+        self.blogBase[listJsonName][postNum]["htmlDir"]=gen_Html
+        self.blogBase[listJsonName][postNum]["labels"]=[label.name for label in issue.labels]
+        self.blogBase[listJsonName][postNum]["postTitle"]=issue.title
+        self.blogBase[listJsonName][postNum]["postUrl"]=urllib.parse.quote(gen_Html[len(self.root_dir):])
 
-            self.blogBase[listJsonName][postNum]["postSourceUrl"]="https://github.com/"+options.repo_name+"/issues/"+str(issue.number)
-            self.blogBase[listJsonName][postNum]["commentNum"]=issue.get_comments().totalCount
+        self.blogBase[listJsonName][postNum]["postSourceUrl"]="https://github.com/"+options.repo_name+"/issues/"+str(issue.number)
+        self.blogBase[listJsonName][postNum]["commentNum"]=issue.get_comments().totalCount
 
-            if issue.body==None:
-                self.blogBase[listJsonName][postNum]["description"]=''
-                self.blogBase[listJsonName][postNum]["wordCount"]=0
-            else:
-                self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
-                if self.blogBase["rssSplit"]=="sentence":
-                    if self.blogBase["i18n"]=="CN":
-                        period="。"
-                    else:
-                        period="."
+        if issue.body==None:
+            self.blogBase[listJsonName][postNum]["description"]=''
+            self.blogBase[listJsonName][postNum]["wordCount"]=0
+        else:
+            self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
+            if self.blogBase["rssSplit"]=="sentence":
+                if self.blogBase["i18n"]=="CN":
+                    period="。"
                 else:
-                    period=self.blogBase["rssSplit"]
-                self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
-                
-            self.blogBase[listJsonName][postNum]["top"]=0
-            for event in issue.get_events():
-                if event.event=="pinned":
-                    self.blogBase[listJsonName][postNum]["top"]=1
-                elif event.event=="unpinned":
-                    self.blogBase[listJsonName][postNum]["top"]=0
-            
-            # This try-except block is now at the top of the function
-            # try:
-            #     postConfig=json.loads(issue.body.split("\r\n")[-1:][0].split("##")[1])
-            #     ...
-            # except:
-            #     postConfig={}
-
-            if "timestamp" in postConfig:
-                self.blogBase[listJsonName][postNum]["createdAt"]=postConfig["timestamp"]
+                    period="."
             else:
-                self.blogBase[listJsonName][postNum]["createdAt"]=int(time.mktime(issue.created_at.timetuple()))
-            
-            if "style" in postConfig:
-                self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]+str(postConfig["style"])
-            else:
-                self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]
+                period=self.blogBase["rssSplit"]
+            self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
 
-            if "script" in postConfig:
-                self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]+str(postConfig["script"])
-            else:
-                self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]
+        self.blogBase[listJsonName][postNum]["top"]=0
+        for event in issue.get_events():
+            if event.event=="pinned":
+                self.blogBase[listJsonName][postNum]["top"]=1
+            elif event.event=="unpinned":
+                self.blogBase[listJsonName][postNum]["top"]=0
 
-            if "head" in postConfig:
-                self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]+str(postConfig["head"])
-            else:
-                self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]
+        if "timestamp" in postConfig:
+            self.blogBase[listJsonName][postNum]["createdAt"]=postConfig["timestamp"]
+        else:
+            self.blogBase[listJsonName][postNum]["createdAt"]=int(time.mktime(issue.created_at.timetuple()))
 
-            if "ogImage" in postConfig:
-                self.blogBase[listJsonName][postNum]["ogImage"]=postConfig["ogImage"]
-            else:
-                self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
+        if "style" in postConfig:
+            self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]+str(postConfig["style"])
+        else:
+            self.blogBase[listJsonName][postNum]["style"]=self.blogBase["style"]
 
-            thisTime=datetime.datetime.fromtimestamp(self.blogBase[listJsonName][postNum]["createdAt"])
-            thisTime=thisTime.astimezone(self.TZ)
-            thisYear=thisTime.year
-            self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
-            self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
+        if "script" in postConfig:
+            self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]+str(postConfig["script"])
+        else:
+            self.blogBase[listJsonName][postNum]["script"]=self.blogBase["script"]
 
-            mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
-            f = open(self.backup_dir+mdFileName+".md", 'w', encoding='UTF-8')
-            
-            if issue.body==None:
-                f.write('')
-            else:
-                f.write(issue.body)
-            f.close()
-            return listJsonName
+        if "head" in postConfig:
+            self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]+str(postConfig["head"])
+        else:
+            self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]
+
+        if "ogImage" in postConfig:
+            self.blogBase[listJsonName][postNum]["ogImage"]=postConfig["ogImage"]
+        else:
+            self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
+
+        thisTime=datetime.datetime.fromtimestamp(self.blogBase[listJsonName][postNum]["createdAt"])
+        thisTime=thisTime.astimezone(self.TZ)
+        thisYear=thisTime.year
+        self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
+        self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
+
+        mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
+        f = open(self.backup_dir+mdFileName+".md", 'w', encoding='UTF-8')
+
+        if issue.body==None:
+            f.write('')
+        else:
+            f.write(issue.body)
+        f.close()
+        return listJsonName
             
     def runAll(self):
         print("====== start create static html ======")
