@@ -72,11 +72,7 @@ class GMEEK():
 
         os.mkdir(self.backup_dir)
         os.mkdir(self.root_dir)
-        
-        # --- [关键修正] ---
-        # 确保 docs/post/ 文件夹一定存在
         os.mkdir(self.post_dir)
-        # --- 修正结束 ---
 
         if os.path.exists(self.static_dir):
             for item in os.listdir(self.static_dir):
@@ -90,7 +86,6 @@ class GMEEK():
                     print(f"Copied directory {item} to docs")
         else:
             print("static does not exist")
-
 
     def defaultConfig(self):
         dconfig={"singlePage":[],"hiddenPage":[],"startSite":"","filingNum":"","onePageListNum":15,"commentLabelColor":"#006b75","yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"],"i18n":"CN","themeMode":"manual","dayTheme":"light","nightTheme":"dark","urlMode":"pinyin","script":"","style":"","head":"","indexScript":"","indexStyle":"","bottomText":"","showPostSource":1,"iconList":{},"UTC":+8,"rssSplit":"sentence","exlink":{},"needComment":1,"allHead":""}
@@ -143,6 +138,8 @@ class GMEEK():
     def renderHtml(self,template,blogBase,postListJson,htmlDir,icon):
         file_loader = FileSystemLoader('templates')
         env = Environment(loader=file_loader)
+        # [新增] 添加 tojson 过滤器
+        env.filters['tojson'] = json.dumps
         template = env.get_template(template)
         output = template.render(blogBase=blogBase,postListJson=postListJson,i18n=self.i18n,IconList=icon)
         f = open(htmlDir, 'w', encoding='UTF-8')
@@ -190,6 +187,9 @@ class GMEEK():
         postBase["description"]=issue["description"]
         postBase["ogImage"]=issue["ogImage"]
         postBase["postBody"]=post_body
+        # [新增] 将 quote 和 daily_sentence 传递给模板
+        postBase["quote"] = issue.get("quote")
+        postBase["daily_sentence"] = issue.get("daily_sentence")
         postBase["commentNum"]=issue["commentNum"]
         postBase["style"]=issue["style"]
         postBase["script"]=issue["script"]
@@ -409,6 +409,12 @@ class GMEEK():
             else:
                 self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
 
+            # [新增] 读取 quote 和 daily_sentence
+            if "quote" in postConfig:
+                self.blogBase[listJsonName][postNum]["quote"] = postConfig["quote"]
+            if "daily_sentence" in postConfig:
+                self.blogBase[listJsonName][postNum]["daily_sentence"] = postConfig["daily_sentence"]
+
             thisTime=datetime.datetime.fromtimestamp(self.blogBase[listJsonName][postNum]["createdAt"])
             thisTime=thisTime.astimezone(self.TZ)
             thisYear=thisTime.year
@@ -521,6 +527,12 @@ for i in blog.blogBase["postListJson"]:
 
     if 'head' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["head"]
+    
+    # [新增] 清理 postList.json
+    if 'quote' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["quote"]
+    if 'daily_sentence' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["daily_sentence"]
 
     if 'commentNum' in blog.blogBase["postListJson"][i]:
         commentNumSum=commentNumSum+blog.blogBase["postListJson"][i]["commentNum"]
@@ -548,4 +560,4 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
-######################################################################################
+###################################################################################
