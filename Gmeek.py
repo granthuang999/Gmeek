@@ -72,7 +72,11 @@ class GMEEK():
 
         os.mkdir(self.backup_dir)
         os.mkdir(self.root_dir)
+        
+        # --- [关键修正] ---
+        # 确保 docs/post/ 文件夹一定存在
         os.mkdir(self.post_dir)
+        # --- 修正结束 ---
 
         if os.path.exists(self.static_dir):
             for item in os.listdir(self.static_dir):
@@ -86,6 +90,7 @@ class GMEEK():
                     print(f"Copied directory {item} to docs")
         else:
             print("static does not exist")
+
 
     def defaultConfig(self):
         dconfig={"singlePage":[],"hiddenPage":[],"startSite":"","filingNum":"","onePageListNum":15,"commentLabelColor":"#006b75","yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"],"i18n":"CN","themeMode":"manual","dayTheme":"light","nightTheme":"dark","urlMode":"pinyin","script":"","style":"","head":"","indexScript":"","indexStyle":"","bottomText":"","showPostSource":1,"iconList":{},"UTC":+8,"rssSplit":"sentence","exlink":{},"needComment":1,"allHead":""}
