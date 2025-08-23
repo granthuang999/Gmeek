@@ -314,12 +314,32 @@ class GMEEK():
 
     def addOnePostJson(self,issue):
         # [MODIFIED] Moved postConfig parsing to the top
-        try:
-            postConfig=json.loads(issue.body.split("\r\n")[-1:][0].split("##")[1])
-            print("Has Custom JSON parameters")
-            print(postConfig)
-        except:
-            postConfig={}
+# --- [新增] 使用更强大的逻辑来解析自定义配置，忽略末尾空行 ---
+    postConfig = {}
+    if issue.body: # 确保 issue.body 不是 None
+        lines = issue.body.splitlines()
+        # 从后往前遍历，找到最后一个非空行
+        last_meaningful_line = ""
+        for line in reversed(lines):
+            stripped_line = line.strip()
+            if stripped_line:
+                last_meaningful_line = stripped_line
+                break
+
+        if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
+            try:
+                # 移除开头的 '##'
+                json_str = last_meaningful_line[2:]
+                postConfig = json.loads(json_str)
+                print("Has Custom JSON parameters")
+                print(postConfig)
+            except json.JSONDecodeError as e:
+                print(f"[ERROR] Failed to parse JSON from the last line. Error: {e}")
+                print(f"[ERROR] The problematic line is: {last_meaningful_line}")
+                postConfig = {} # 解析失败则重置
+        else:
+            # 为了调试，我们打印出最后一行，看看为什么它不匹配
+            print(f"Debug: Last meaningful line does not match format '##{{...}}'. Line is: '{last_meaningful_line}'")
 
         if len(issue.labels)>=1:
             if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
