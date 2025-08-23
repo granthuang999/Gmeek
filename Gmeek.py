@@ -311,8 +311,7 @@ class GMEEK():
         print("====== create rss xml ======")
         feed.rss_file(self.root_dir+'rss.xml')
 
-
-    def addOnePostJson(self,issue):
+def addOnePostJson(self,issue):
     # --- [关键修改] 使用更强大的逻辑来解析自定义配置，忽略末尾空行 ---
     postConfig = {}
     if issue.body: # 确保 issue.body 不是 None
