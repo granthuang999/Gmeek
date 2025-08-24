@@ -177,7 +177,7 @@ class GMEEK():
             issue["script"]=issue["script"]+'<script>MathJax = {tex: {inlineMath: [["$", "$"]]}};</script><script async src="[https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js](https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js)"></script>'
         
         if '<p class="markdown-alert-title">' in post_body:
-            issue["style"]=issue["style"]+'<style>.markdown-alert{padding:0.5rem 1rem;margin-bottom:1rem;border-left:.25em solid var(--borderColor-default,var(--color-border-default));}.markdown-alert .markdown-alert-title {display:flex;font-weight:var(--base-text-weight-medium,500);align-items:center;line-height:1;}.markdown-alert>:first-child {margin-top:0;}.markdown-alert>:last-child {margin-bottom:0;}</style>'
+            issue["style"]=issue["style"]+'<style>.markdown-alert{padding:0.5rem 1rem;margin-bottom:1rem;border-left:.25em solid var(--borderColor-default,var(--color-border-default));}.markdown-alert .markdown-alert-title {display:flex;font-weight:var(--base-text-weight-medium,500);align-items-center;line-height:1;}.markdown-alert>:first-child {margin-top:0;}.markdown-alert>:last-child {margin-bottom:0;}</style>'
             alerts = { 'note': 'accent', 'tip': 'success', 'important': 'done', 'warning': 'attention', 'caution': 'danger' }
             for alert, style in alerts.items():
                 if f'markdown-alert-{alert}' in post_body:
@@ -223,7 +223,6 @@ class GMEEK():
         postIcon=dict(zip(keys, map(IconBase.get, keys)))
         self.renderHtml('post.html',postBase,{},issue["htmlDir"],postIcon)
         print("create postPage title=%s file=%s " % (issue["postTitle"],issue["htmlDir"]))
-
     def createPlistHtml(self):
         # [关键修改] 过滤掉时间戳在未来的文章
         current_time = int(time.time())
@@ -338,7 +337,6 @@ class GMEEK():
 
         print("====== create rss xml ======")
         feed.rss_file(self.root_dir+'rss.xml')
-
     def addOnePostJson(self,issue):
         # 使用更强大的逻辑来解析自定义配置，忽略末尾空行
         postConfig = {}
@@ -562,13 +560,14 @@ for i in blog.blogBase["postListJson"]:
 
     if 'head' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["head"]
-    if 'quote' in blog.blog.blogBase["postListJson"][i]:
-        del blog.blog.blogBase["postListJson"][i]["quote"]
-    if 'daily_sentence' in blog.blog.blogBase["postListJson"][i]:
-        del blog.blog.blogBase["postListJson"][i]["daily_sentence"]
+    # [关键修正] 修复了错误的变量名
+    if 'quote' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["quote"]
+    if 'daily_sentence' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["daily_sentence"]
 
     if 'commentNum' in blog.blogBase["postListJson"][i]:
-        commentNumSum=commentNumSum+blog.blogBase["postListJson"][i]["commentNum"]
+        commentNumSum=commentNumSum+blog.blogGMEEK.py (定时发布版, 3/3)Base["postListJson"][i]["commentNum"]
         del blog.blogBase["postListJson"][i]["commentNum"]
 
     if 'wordCount' in blog.blogBase["postListJson"][i]:
@@ -585,13 +584,12 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     print("====== update readme file ======")
     workspace_path = os.environ.get('GITHUB_WORKSPACE')
     readme="# %s :link: %s \r\n" % (blog.blogBase["title"],blog.blogBase["homeUrl"])
-    readme=readme+"### :page_facing_up: [%d](%s/tag.html) \r\n" % (len(blog.blogBase["postListJson"])-1,blog.blogBase["homeUrl"])
+    readme=readme+"### :page_facing_up: [%d](%s/tag.html) \r\n" % (len(blog.blogBase["postListJson"]),blog.blogBase["homeUrl"]) # [修正] 移除了 -1
     readme=readme+"### :speech_balloon: %d \r\n" % commentNumSum
     readme=readme+"### :hibiscus: %d \r\n" % wordCount
     readme=readme+"### :alarm_clock: %s \r\n" % datetime.datetime.now(blog.TZ).strftime('%Y-%m-%d %H:%M:%S')
-    readme=readme+"### Powered by :heart: [疯子](https://github.com/granthuang999/Gmeek)\r\n"
+    readme=readme+"### Powered by :heart: [Gmeek](https://github.com/granthuang999/Gmeek)\r\n" # [修正] 更新了链接
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
 ######################################################################################
-
