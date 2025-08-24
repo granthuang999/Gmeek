@@ -149,45 +149,52 @@ class GMEEK():
     def createPostHtml(self,issue):
         mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue["postTitle"])
         f = open(self.backup_dir+mdFileName+".md", 'r', encoding='UTF-8')
-        post_body=self.markdown2html(f.read())
+        raw_md_content = f.read()
         f.close()
+
+        post_body = ""
+        # --- [关键修改] ---
+        # 检查原始内容是否为直接发布的HTML块
+        if raw_md_content.strip().startswith("```Gmeek-html"):
+            print("Gmeek-html block detected. Bypassing markdown conversion.")
+            # 直接提取代码块内的HTML内容
+            content_inside_block = raw_md_content.strip()[len("```Gmeek-html"):].strip()
+            if content_inside_block.endswith("```"):
+                post_body = content_inside_block[:-3].strip()
+            else:
+                post_body = content_inside_block
+        else:
+            # 对于普通文章，继续使用原来的markdown转换流程
+            post_body = self.markdown2html(raw_md_content)
+        # --- 修改结束 ---
 
         postBase=self.blogBase.copy()
 
-        if '<math-renderer' in post_body:
-            post_body=re.sub(r'<math-renderer.*?>','',post_body)
-            post_body=re.sub(r'</math-renderer>','',post_body)
-            issue["script"]=issue["script"]+'<script>MathJax = {tex: {inlineMath: [["$", "$"]]}};</script><script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>'
-        
-        if '<p class="markdown-alert-title">' in post_body:
-            issue["style"]=issue["style"]+'<style>.markdown-alert{padding:0.5rem 1rem;margin-bottom:1rem;border-left:.25em solid var(--borderColor-default,var(--color-border-default));}.markdown-alert .markdown-alert-title {display:flex;font-weight:var(--base-text-weight-medium,500);align-items:center;line-height:1;}.markdown-alert>:first-child {margin-top:0;}.markdown-alert>:last-child {margin-bottom:0;}</style>'
-            alerts = {
-                'note': 'accent',
-                'tip': 'success',
-                'important': 'done',
-                'warning': 'attention',
-                'caution': 'danger'
-            }
-
-            for alert, style in alerts.items():
-                if f'markdown-alert-{alert}' in post_body:
-                    issue["style"] += (
-                        f'<style>.markdown-alert.markdown-alert-{alert} {{'
-                        f'border-left-color:var(--borderColor-{style}-emphasis, var(--color-{style}-emphasis));'
-                        f'background-color:var(--color-{style}-subtle);}}'
-                        f'.markdown-alert.markdown-alert-{alert} .markdown-alert-title {{'
-                        f'color: var(--fgColor-{style},var(--color-{style}-fg));}}</style>'
-                    )
-
-        if '<code class="notranslate">Gmeek-html' in post_body:
-            post_body = re.sub(r'<code class="notranslate">Gmeek-html(.*?)</code>', lambda match: html.unescape(match.group(1)), post_body, flags=re.DOTALL)
+        # 仅在普通Markdown文章中处理这些特殊标签
+        if not raw_md_content.strip().startswith("```Gmeek-html"):
+            if '<math-renderer' in post_body:
+                post_body=re.sub(r'<math-renderer.*?>','',post_body)
+                post_body=re.sub(r'</math-renderer>','',post_body)
+                issue["script"]=issue["script"]+'<script>MathJax = {tex: {inlineMath: [["$", "$"]]}};</script><script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>'
+            
+            if '<p class="markdown-alert-title">' in post_body:
+                issue["style"]=issue["style"]+'<style>.markdown-alert{padding:0.5rem 1rem;margin-bottom:1rem;border-left:.25em solid var(--borderColor-default,var(--color-border-default));}.markdown-alert .markdown-alert-title {display:flex;font-weight:var(--base-text-weight-medium,500);align-items:center;line-height:1;}.markdown-alert>:first-child {margin-top:0;}.markdown-alert>:last-child {margin-bottom:0;}</style>'
+                alerts = { 'note': 'accent', 'tip': 'success', 'important': 'done', 'warning': 'attention', 'caution': 'danger' }
+                for alert, style in alerts.items():
+                    if f'markdown-alert-{alert}' in post_body:
+                        issue["style"] += (
+                            f'<style>.markdown-alert.markdown-alert-{alert} {{'
+                            f'border-left-color:var(--borderColor-{style}-emphasis, var(--color-{style}-emphasis));'
+                            f'background-color:var(--color-{style}-subtle);}}'
+                            f'.markdown-alert.markdown-alert-{alert} .markdown-alert-title {{'
+                            f'color: var(--fgColor-{style},var(--color-{style}-fg));}}</style>'
+                        )
 
         postBase["postTitle"]=issue["postTitle"]
         postBase["postUrl"]=self.blogBase["homeUrl"]+"/"+issue["postUrl"]
         postBase["description"]=issue["description"]
         postBase["ogImage"]=issue["ogImage"]
         postBase["postBody"]=post_body
-        # [新增] 将 quote 和 daily_sentence 传递给模板
         postBase["quote"] = issue.get("quote")
         postBase["daily_sentence"] = issue.get("daily_sentence")
         postBase["commentNum"]=issue["commentNum"]
@@ -214,6 +221,7 @@ class GMEEK():
         postIcon=dict(zip(keys, map(IconBase.get, keys)))
         self.renderHtml('post.html',postBase,{},issue["htmlDir"],postIcon)
         print("create postPage title=%s file=%s " % (issue["postTitle"],issue["htmlDir"]))
+
 
     def createPlistHtml(self):
         self.blogBase["postListJson"]=dict(sorted(self.blogBase["postListJson"].items(),key=lambda x:(x[1]["top"],x[1]["createdAt"]),reverse=True))#使列表由时间排序
