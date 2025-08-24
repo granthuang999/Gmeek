@@ -138,7 +138,6 @@ class GMEEK():
     def renderHtml(self,template,blogBase,postListJson,htmlDir,icon):
         file_loader = FileSystemLoader('templates')
         env = Environment(loader=file_loader)
-        # [新增] 添加 tojson 过滤器
         env.filters['tojson'] = json.dumps
         template = env.get_template(template)
         output = template.render(blogBase=blogBase,postListJson=postListJson,i18n=self.i18n,IconList=icon)
@@ -152,31 +151,26 @@ class GMEEK():
         raw_md_content = f.read()
         f.close()
 
-        # --- [关键修改] ---
-        # 检查是否为独立的、完整的 HTML 页面
         stripped_content = raw_md_content.strip()
         if stripped_content.startswith("```Gmeek-html"):
-            print("Gmeek-html block detected.")
-            # 提取代码块内的HTML内容
+            print("Gmeek-html block detected. Bypassing markdown conversion.")
             content_inside_block = stripped_content[len("```Gmeek-html"):].strip()
             if content_inside_block.endswith("```"):
                 final_html = content_inside_block[:-3].strip()
             else:
                 final_html = content_inside_block
 
-            # 检查这是否是一个完整的 HTML 文档
             if final_html.lower().lstrip().startswith("<!doctype html"):
                 print("Full HTML page detected. Writing directly to file, bypassing template.")
-                # 直接将完整的HTML写入文件，绕过模板系统
                 with open(issue["htmlDir"], 'w', encoding='UTF-8') as html_file:
                     html_file.write(final_html)
                 print("create postPage title=%s file=%s " % (issue["postTitle"],issue["htmlDir"]))
-                return # 直接结束函数，不再执行后续的模板渲染
+                return
 
-        # --- 如果不是独立的 HTML 页面，则执行原来的逻辑 ---
         post_body = self.markdown2html(raw_md_content)
         
         postBase=self.blogBase.copy()
+
         if '<math-renderer' in post_body:
             post_body=re.sub(r'<math-renderer.*?>','',post_body)
             post_body=re.sub(r'</math-renderer>','',post_body)
@@ -229,10 +223,16 @@ class GMEEK():
         postIcon=dict(zip(keys, map(IconBase.get, keys)))
         self.renderHtml('post.html',postBase,{},issue["htmlDir"],postIcon)
         print("create postPage title=%s file=%s " % (issue["postTitle"],issue["htmlDir"]))
-    
 
     def createPlistHtml(self):
-        self.blogBase["postListJson"]=dict(sorted(self.blogBase["postListJson"].items(),key=lambda x:(x[1]["top"],x[1]["createdAt"]),reverse=True))#使列表由时间排序
+        # [关键修改] 过滤掉时间戳在未来的文章
+        current_time = int(time.time())
+        published_posts = {
+            k: v for k, v in self.blogBase["postListJson"].items()
+            if v["createdAt"] <= current_time
+        }
+        
+        self.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:(x[1]["top"],x[1]["createdAt"]),reverse=True))#使列表由时间排序
         keys=list(OrderedDict.fromkeys(['sun', 'moon','sync', 'search', 'rss', 'upload', 'post'] + self.blogBase["singlePage"]))
         plistIcon={**dict(zip(keys, map(IconBase.get, keys))),**self.blogBase["iconList"]}
         keys=['sun','moon','sync','home','search','post']
@@ -285,7 +285,14 @@ class GMEEK():
         print("create tag.html")
 
     def createFeedXml(self):
-        self.blogBase["postListJson"]=dict(sorted(self.blogBase["postListJson"].items(),key=lambda x:x[1]["createdAt"],reverse=False))#使列表由时间排序
+        # [关键修改] 过滤掉时间戳在未来的文章
+        current_time = int(time.time())
+        published_posts = {
+            k: v for k, v in self.blogBase["postListJson"].items()
+            if v["createdAt"] <= current_time
+        }
+        
+        self.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:x[1]["createdAt"],reverse=False))#使列表由时间排序
         feed = FeedGenerator()
         feed.title(self.blogBase["title"])
         feed.description(self.blogBase["subTitle"])
@@ -331,6 +338,7 @@ class GMEEK():
 
         print("====== create rss xml ======")
         feed.rss_file(self.root_dir+'rss.xml')
+
     def addOnePostJson(self,issue):
         # 使用更强大的逻辑来解析自定义配置，忽略末尾空行
         postConfig = {}
@@ -358,6 +366,10 @@ class GMEEK():
             else:
                 # 为了调试，我们打印出最后一行，看看为什么它不匹配
                 print(f"Debug: Last meaningful line does not match format '##{{...}}'. Line is: '{last_meaningful_line}'")
+
+        if len(issue.labels) == 0:
+            print(f"Skipping issue #{issue.number} because it has no labels.")
+            return None # [关键修改] 如果没有标签，则跳过
 
         if len(issue.labels)>=1:
             if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
@@ -425,7 +437,6 @@ class GMEEK():
             else:
                 self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
 
-            # [新增] 读取 quote 和 daily_sentence
             if "quote" in postConfig:
                 self.blogBase[listJsonName][postNum]["quote"] = postConfig["quote"]
             if "daily_sentence" in postConfig:
@@ -470,7 +481,8 @@ class GMEEK():
         issue=self.repo.get_issue(int(number_str))
         if issue.state == "open":
             listJsonName=self.addOnePostJson(issue)
-            self.createPostHtml(self.blogBase[listJsonName]["P"+number_str])
+            if listJsonName: # [关键修改] 确保 listJsonName 不是 None
+                self.createPostHtml(self.blogBase[listJsonName]["P"+number_str])
             self.createPlistHtml()
             self.createFeedXml()
             print("====== create static html end ======")
@@ -530,7 +542,14 @@ listFile.close()
 commentNumSum=0
 wordCount=0
 print("====== create postList.json file ======")
-blog.blogBase["postListJson"]=dict(sorted(blog.blogBase["postListJson"].items(),key=lambda x:x[1]["createdAt"],reverse=True))#使列表由时间排序
+# [关键修改] 过滤掉时间戳在未来的文章
+current_time = int(time.time())
+published_posts = {
+    k: v for k, v in blog.blogBase["postListJson"].items()
+    if v["createdAt"] <= current_time
+}
+blog.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:x[1]["createdAt"],reverse=True))#使列表由时间排序
+
 for i in blog.blogBase["postListJson"]:
     del blog.blogBase["postListJson"][i]["description"]
     del blog.blogBase["postListJson"][i]["postSourceUrl"]
@@ -543,12 +562,10 @@ for i in blog.blogBase["postListJson"]:
 
     if 'head' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["head"]
-    
-    # [新增] 清理 postList.json
-    if 'quote' in blog.blogBase["postListJson"][i]:
-        del blog.blogBase["postListJson"][i]["quote"]
-    if 'daily_sentence' in blog.blogBase["postListJson"][i]:
-        del blog.blogBase["postListJson"][i]["daily_sentence"]
+    if 'quote' in blog.blog.blogBase["postListJson"][i]:
+        del blog.blog.blogBase["postListJson"][i]["quote"]
+    if 'daily_sentence' in blog.blog.blogBase["postListJson"][i]:
+        del blog.blog.blogBase["postListJson"][i]["daily_sentence"]
 
     if 'commentNum' in blog.blogBase["postListJson"][i]:
         commentNumSum=commentNumSum+blog.blogBase["postListJson"][i]["commentNum"]
@@ -576,4 +593,5 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
-###################################################################################
+######################################################################################
+
