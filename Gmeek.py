@@ -194,6 +194,7 @@ class GMEEK():
 
         postBase["postTitle"]=issue["postTitle"]
         postBase["postUrl"]=self.blogBase["homeUrl"]+"/"+issue["postUrl"]
+        postBase["description"]=issue["description"]
         postBase["ogImage"]=issue["ogImage"]
         postBase["postBody"]=post_body
         postBase["quote"] = issue.get("quote")
@@ -205,7 +206,6 @@ class GMEEK():
         postBase["top"]=issue["top"]
         postBase["postSourceUrl"]=issue["postSourceUrl"]
         postBase["repoName"]=options.repo_name
-        postBase["description"] = issue["description"]
         
         if issue["labels"][0] in self.blogBase["singlePage"]:
             postBase["bottomText"]=''
@@ -394,17 +394,14 @@ class GMEEK():
                 self.blogBase[listJsonName][postNum]["wordCount"]=0
             else:
                 self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
-                if "description" in postConfig:
-                    self.blogBase[listJsonName][postNum]["description"] = postConfig["description"]
-                elif self.blogBase["rssSplit"]=="sentence":
+                if self.blogBase["rssSplit"]=="sentence":
                     if self.blogBase["i18n"]=="CN":
                         period="。"
                     else:
                         period="."
-                    self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
                 else:
                     period=self.blogBase["rssSplit"]
-                    self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
+                self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
                 
             self.blogBase[listJsonName][postNum]["top"]=0
             for event in issue.get_events():
@@ -447,7 +444,6 @@ class GMEEK():
             thisTime=thisTime.astimezone(self.TZ)
             thisYear=thisTime.year
             self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
-            self.blogBase[listJsonName][postNum]["isoDate"] = thisTime.isoformat()
             self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
 
             mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
@@ -569,8 +565,6 @@ for i in blog.blogBase["postListJson"]:
         del blog.blogBase["postListJson"][i]["quote"]
     if 'daily_sentence' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["daily_sentence"]
-    if 'isoDate' in blog.blogBase["postListJson"][i]:
-        del blog.blogBase["postListJson"][i]["isoDate"]
 
     if 'commentNum' in blog.blogBase["postListJson"][i]:
         commentNumSum=commentNumSum+blog.blogBase["postListJson"][i]["commentNum"]
@@ -590,11 +584,12 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     print("====== update readme file ======")
     workspace_path = os.environ.get('GITHUB_WORKSPACE')
     readme="# %s :link: %s \r\n" % (blog.blogBase["title"],blog.blogBase["homeUrl"])
+    readme=readme+"## [网站调试日志](https://www.futuremedia.work/post/debugging-log.html)\r\n" # [修正] 更新了链接
     readme=readme+"### :page_facing_up: [%d](%s/tag.html) \r\n" % (len(blog.blogBase["postListJson"]),blog.blogBase["homeUrl"]) # [修正] 移除了 -1
     readme=readme+"### :speech_balloon: %d \r\n" % commentNumSum
     readme=readme+"### :hibiscus: %d \r\n" % wordCount
     readme=readme+"### :alarm_clock: %s \r\n" % datetime.datetime.now(blog.TZ).strftime('%Y-%m-%d %H:%M:%S')
-    readme=readme+"### Powered by :heart: [Gmeek](https://github.com/granthuang999/Gmeek)\r\n" # [修正] 更新了链接
+    readme=readme+"### Powered by :heart: [疯子](https://www.futuremedia.work)\r\n" # [修正] 更新了链接
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
