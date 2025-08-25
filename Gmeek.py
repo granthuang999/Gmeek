@@ -194,7 +194,6 @@ class GMEEK():
 
         postBase["postTitle"]=issue["postTitle"]
         postBase["postUrl"]=self.blogBase["homeUrl"]+"/"+issue["postUrl"]
-        postBase["description"]=issue["description"]
         postBase["ogImage"]=issue["ogImage"]
         postBase["postBody"]=post_body
         postBase["quote"] = issue.get("quote")
@@ -206,8 +205,9 @@ class GMEEK():
         postBase["top"]=issue["top"]
         postBase["postSourceUrl"]=issue["postSourceUrl"]
         postBase["repoName"]=options.repo_name
+        postBase["description"] = issue["description"]
         
-        if issue["labels"][0] in self.blogBase["singlePage"]:
+        if len(issue.get("labels", [])) > 0 and issue["labels"][0] in self.blogBase["singlePage"]:
             postBase["bottomText"]=''
 
         if '<pre class="notranslate">' in post_body:
@@ -224,14 +224,7 @@ class GMEEK():
         self.renderHtml('post.html',postBase,{},issue["htmlDir"],postIcon)
         print("create postPage title=%s file=%s " % (issue["postTitle"],issue["htmlDir"]))
     def createPlistHtml(self):
-        # [关键修改] 过滤掉时间戳在未来的文章
-        current_time = int(time.time())
-        published_posts = {
-            k: v for k, v in self.blogBase["postListJson"].items()
-            if v["createdAt"] <= current_time
-        }
-        
-        self.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:(x[1]["top"],x[1]["createdAt"]),reverse=True))#使列表由时间排序
+        self.blogBase["postListJson"]=dict(sorted(self.blogBase["postListJson"].items(),key=lambda x:(x[1]["top"],x[1]["createdAt"]),reverse=True))#使列表由时间排序
         keys=list(OrderedDict.fromkeys(['sun', 'moon','sync', 'search', 'rss', 'upload', 'post'] + self.blogBase["singlePage"]))
         plistIcon={**dict(zip(keys, map(IconBase.get, keys))),**self.blogBase["iconList"]}
         keys=['sun','moon','sync','home','search','post']
@@ -284,14 +277,7 @@ class GMEEK():
         print("create tag.html")
 
     def createFeedXml(self):
-        # [关键修改] 过滤掉时间戳在未来的文章
-        current_time = int(time.time())
-        published_posts = {
-            k: v for k, v in self.blogBase["postListJson"].items()
-            if v["createdAt"] <= current_time
-        }
-        
-        self.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:x[1]["createdAt"],reverse=False))#使列表由时间排序
+        self.blogBase["postListJson"]=dict(sorted(self.blogBase["postListJson"].items(),key=lambda x:x[1]["createdAt"],reverse=False))#使列表由时间排序
         feed = FeedGenerator()
         feed.title(self.blogBase["title"])
         feed.description(self.blogBase["subTitle"])
@@ -367,7 +353,7 @@ class GMEEK():
 
         if len(issue.labels) == 0:
             print(f"Skipping issue #{issue.number} because it has no labels.")
-            return None # [关键修改] 如果没有标签，则跳过
+            return None
 
         if len(issue.labels)>=1:
             if issue.labels[0].name in self.blogBase["singlePage"] or issue.labels[0].name in self.blogBase["hiddenPage"]:
@@ -394,14 +380,18 @@ class GMEEK():
                 self.blogBase[listJsonName][postNum]["wordCount"]=0
             else:
                 self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
-                if self.blogBase["rssSplit"]=="sentence":
+                # [关键修改] 优先使用自定义 description
+                if "description" in postConfig:
+                    self.blogBase[listJsonName][postNum]["description"] = postConfig["description"]
+                elif self.blogBase["rssSplit"]=="sentence":
                     if self.blogBase["i18n"]=="CN":
                         period="。"
                     else:
                         period="."
+                    self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
                 else:
                     period=self.blogBase["rssSplit"]
-                self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
+                    self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
                 
             self.blogBase[listJsonName][postNum]["top"]=0
             for event in issue.get_events():
@@ -444,6 +434,8 @@ class GMEEK():
             thisTime=thisTime.astimezone(self.TZ)
             thisYear=thisTime.year
             self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
+            # [关键修改] 增加 isoDate 用于 Schema
+            self.blogBase[listJsonName][postNum]["isoDate"] = thisTime.isoformat()
             self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
 
             mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
@@ -479,7 +471,7 @@ class GMEEK():
         issue=self.repo.get_issue(int(number_str))
         if issue.state == "open":
             listJsonName=self.addOnePostJson(issue)
-            if listJsonName: # [关键修改] 确保 listJsonName 不是 None
+            if listJsonName:
                 self.createPostHtml(self.blogBase[listJsonName]["P"+number_str])
             self.createPlistHtml()
             self.createFeedXml()
@@ -540,16 +532,14 @@ listFile.close()
 commentNumSum=0
 wordCount=0
 print("====== create postList.json file ======")
-# [关键修改] 过滤掉时间戳在未来的文章
 current_time = int(time.time())
 published_posts = {
     k: v for k, v in blog.blogBase["postListJson"].items()
     if v["createdAt"] <= current_time
 }
-blog.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:x[1]["createdAt"],reverse=True))#使列表由时间排序
+blog.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:x[1]["createdAt"],reverse=True))
 
-for i in blog.blogBase["postListJson"]:
-    del blog.blogBase["postListJson"][i]["description"]
+for i in list(blog.blogBase["postListJson"]): # 使用 list() 来避免在迭代时修改字典
     del blog.blogBase["postListJson"][i]["postSourceUrl"]
     del blog.blogBase["postListJson"][i]["htmlDir"]
     del blog.blogBase["postListJson"][i]["createdAt"]
@@ -560,11 +550,12 @@ for i in blog.blogBase["postListJson"]:
 
     if 'head' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["head"]
-    # [关键修正] 修复了错误的变量名
     if 'quote' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["quote"]
     if 'daily_sentence' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["daily_sentence"]
+    if 'isoDate' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["isoDate"]
 
     if 'commentNum' in blog.blogBase["postListJson"][i]:
         commentNumSum=commentNumSum+blog.blogBase["postListJson"][i]["commentNum"]
@@ -584,12 +575,11 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     print("====== update readme file ======")
     workspace_path = os.environ.get('GITHUB_WORKSPACE')
     readme="# %s :link: %s \r\n" % (blog.blogBase["title"],blog.blogBase["homeUrl"])
-    readme=readme+"## [网站调试日志](https://www.futuremedia.work/post/debugging-log.html)\r\n" # [修正] 更新了链接
-    readme=readme+"### :page_facing_up: [%d](%s/tag.html) \r\n" % (len(blog.blogBase["postListJson"]),blog.blogBase["homeUrl"]) # [修正] 移除了 -1
+    readme=readme+"### :page_facing_up: [%d](%s/tag.html) \r\n" % (len(blog.blogBase["postListJson"]),blog.blogBase["homeUrl"])
     readme=readme+"### :speech_balloon: %d \r\n" % commentNumSum
     readme=readme+"### :hibiscus: %d \r\n" % wordCount
     readme=readme+"### :alarm_clock: %s \r\n" % datetime.datetime.now(blog.TZ).strftime('%Y-%m-%d %H:%M:%S')
-    readme=readme+"### Powered by :heart: [疯子](https://www.futuremedia.work)\r\n" # [修正] 更新了链接
+    readme=readme+"### Powered by :heart: [Gmeek](https://github.com/granthuang999/Gmeek)\r\n"
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
