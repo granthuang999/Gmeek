@@ -207,7 +207,7 @@ class GMEEK():
         postBase["repoName"]=options.repo_name
         postBase["description"] = issue["description"]
         
-        if len(issue.labels) > 0 and issue.labels[0].name in self.blogBase["singlePage"]:
+        if len(issue.get("labels", [])) > 0 and issue["labels"][0] in self.blogBase["singlePage"]:
             postBase["bottomText"]=''
 
         if '<pre class="notranslate">' in post_body:
@@ -539,31 +539,31 @@ published_posts = {
 }
 blog.blogBase["postListJson"]=dict(sorted(published_posts.items(),key=lambda x:x[1]["createdAt"],reverse=True))
 
-for i in blog.blogBase["postListJson"]:
-    del blog.blogBase["postListJson"]["postSourceUrl"]
-    del blog.blogBase["postListJson"]["htmlDir"]
-    del blog.blogBase["postListJson"]["createdAt"]
-    del blog.blogBase["postListJson"]["script"]
-    del blog.blogBase["postListJson"]["style"]
-    del blog.blogBase["postListJson"]["top"]
-    del blog.blogBase["postListJson"]["ogImage"]
+for i in list(blog.blogBase["postListJson"]): # 使用 list() 来避免在迭代时修改字典
+    del blog.blogBase["postListJson"][i]["postSourceUrl"]
+    del blog.blogBase["postListJson"][i]["htmlDir"]
+    del blog.blogBase["postListJson"][i]["createdAt"]
+    del blog.blogBase["postListJson"][i]["script"]
+    del blog.blogBase["postListJson"][i]["style"]
+    del blog.blogBase["postListJson"][i]["top"]
+    del blog.blogBase["postListJson"][i]["ogImage"]
 
-    if 'head' in blog.blogBase["postListJson"]:
-        del blog.blogBase["postListJson"]["head"]
-    if 'quote' in blog.blogBase["postListJson"]:
-        del blog.blogBase["postListJson"]["quote"]
-    if 'daily_sentence' in blog.blogBase["postListJson"]:
-        del blog.blogBase["postListJson"]["daily_sentence"]
-    if 'isoDate' in blog.blogBase["postListJson"]:
-        del blog.blogBase["postListJson"]["isoDate"]
+    if 'head' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["head"]
+    if 'quote' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["quote"]
+    if 'daily_sentence' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["daily_sentence"]
+    if 'isoDate' in blog.blogBase["postListJson"][i]:
+        del blog.blogBase["postListJson"][i]["isoDate"]
 
-    if 'commentNum' in blog.blogBase["postListJson"]:
-        commentNumSum=commentNumSum+blog.blogBase["postListJson"]["commentNum"]
-        del blog.blogBase["postListJson"]["commentNum"]
+    if 'commentNum' in blog.blogBase["postListJson"][i]:
+        commentNumSum=commentNumSum+blog.blogBase["postListJson"][i]["commentNum"]
+        del blog.blogBase["postListJson"][i]["commentNum"]
 
-    if 'wordCount' in blog.blogBase["postListJson"]:
-        wordCount=wordCount+blog.blogBase["postListJson"]["wordCount"]
-        del blog.blogBase["postListJson"]["wordCount"]
+    if 'wordCount' in blog.blogBase["postListJson"][i]:
+        wordCount=wordCount+blog.blogBase["postListJson"][i]["wordCount"]
+        del blog.blogBase["postListJson"][i]["wordCount"]
 
 blog.blogBase["postListJson"]["labelColorDict"]=blog.labelColorDict
 
