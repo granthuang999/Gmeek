@@ -206,6 +206,8 @@ class GMEEK():
         postBase["postSourceUrl"]=issue["postSourceUrl"]
         postBase["repoName"]=options.repo_name
         postBase["description"] = issue["description"]
+        # [新增] 将 keywords 传递给模板
+        postBase["keywords"] = issue.get("keywords")
         
         if len(issue.get("labels", [])) > 0 and issue["labels"][0] in self.blogBase["singlePage"]:
             postBase["bottomText"]=''
@@ -417,13 +419,11 @@ class GMEEK():
             else:
                 self.blogBase[listJsonName][postNum]["head"]=self.blogBase["head"]
 
-            # [关键修改] 优先使用自定义 ogImage
             if "ogImage" in postConfig:
                 self.blogBase[listJsonName][postNum]["ogImage"]=postConfig["ogImage"]
             else:
                 self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
             
-            # [新增] 读取 keywords
             if "keywords" in postConfig:
                 self.blogBase[listJsonName][postNum]["keywords"] = postConfig["keywords"]
 
@@ -570,7 +570,7 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     readme=readme+"### :speech_balloon: %d \r\n" % commentNumSum
     readme=readme+"### :hibiscus: %d \r\n" % wordCount
     readme=readme+"### :alarm_clock: %s \r\n" % datetime.datetime.now(blog.TZ).strftime('%Y-%m-%d %H:%M:%S')
-    readme=readme+"### Powered by :heart: [疯子](https://www.futuremedia.work)\r\n"
+    readme=readme+"### Powered by :heart: [Gmeek](https://github.com/granthuang999/Gmeek)\r\n"
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
