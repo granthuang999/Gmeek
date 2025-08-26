@@ -570,7 +570,7 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     readme=readme+"### :speech_balloon: %d \r\n" % commentNumSum
     readme=readme+"### :hibiscus: %d \r\n" % wordCount
     readme=readme+"### :alarm_clock: %s \r\n" % datetime.datetime.now(blog.TZ).strftime('%Y-%m-%d %H:%M:%S')
-    readme=readme+"### Powered by :heart: [Gmeek](https://github.com/granthuang999/Gmeek)\r\n"
+    readme=readme+"### Powered by :heart: [未来传媒](https://www.futuremedia.work)\r\n"
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
