@@ -431,7 +431,6 @@ class GMEEK():
             thisTime=thisTime.astimezone(self.TZ)
             thisYear=thisTime.year
             self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
-            self.blogBase[listJsonName][postNum]["isoDate"] = thisTime.isoformat()
             self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
 
             mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
@@ -548,8 +547,6 @@ for i in list(blog.blogBase["postListJson"]):
         del blog.blogBase["postListJson"][i]["head"]
     if 'keywords' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["keywords"]
-    if 'isoDate' in blog.blogBase["postListJson"][i]: 
-        del blog.blogBase["postListJson"][i]["isoDate"]
 
     if 'commentNum' in blog.blogBase["postListJson"][i]:
         commentNumSum=commentNumSum+blog.blogBase["postListJson"][i]["commentNum"]
@@ -558,7 +555,7 @@ for i in list(blog.blogBase["postListJson"]):
     if 'wordCount' in blog.blogBase["postListJson"][i]:
         wordCount=wordCount+blog.blogBase["postListJson"][i]["wordCount"]
         del blog.blogBase["postListJson"][i]["wordCount"]
- 
+
 blog.blogBase["postListJson"]["labelColorDict"]=blog.labelColorDict
 
 docListFile=open(blog.root_dir+"postList.json","w")
@@ -573,7 +570,7 @@ if os.environ.get('GITHUB_EVENT_NAME')!='schedule':
     readme=readme+"### :speech_balloon: %d \r\n" % commentNumSum
     readme=readme+"### :hibiscus: %d \r\n" % wordCount
     readme=readme+"### :alarm_clock: %s \r\n" % datetime.datetime.now(blog.TZ).strftime('%Y-%m-%d %H:%M:%S')
-    readme=readme+"### Powered by :heart: [未来传媒](https://www.futuremedia.work)\r\n"
+    readme=readme+"### Powered by :heart: [Gmeek](https://github.com/granthuang999/Gmeek)\r\n"
     readmeFile=open(workspace_path+"/README.md","w")
     readmeFile.write(readme)
     readmeFile.close()
