@@ -204,8 +204,10 @@ class GMEEK():
         postBase["script"]=issue["script"]
         postBase["head"]=issue["head"]
         postBase["top"]=issue["top"]
-        postBase["postSourceUrl"]=issue["postSourceUrl"]
+        postBase["postSourceUrl"]=issue["  postSourceUrl"]
         postBase["repoName"]=options.repo_name
+        postBase["keywords"] = issue.get("keywords")
+        postBase["isoDate"] = issue.get("isoDate")
         
         if issue["labels"][0] in self.blogBase["singlePage"]:
             postBase["bottomText"]=''
@@ -435,6 +437,9 @@ class GMEEK():
             else:
                 self.blogBase[listJsonName][postNum]["ogImage"]=self.blogBase["ogImage"]
 
+            if "keywords" in postConfig: 
+                self.blogBase[listJsonName][postNum]["keywords"] = postConfig["keywords"]
+
             if "quote" in postConfig:
                 self.blogBase[listJsonName][postNum]["quote"] = postConfig["quote"]
             if "daily_sentence" in postConfig:
@@ -444,6 +449,7 @@ class GMEEK():
             thisTime=thisTime.astimezone(self.TZ)
             thisYear=thisTime.year
             self.blogBase[listJsonName][postNum]["createdDate"]=thisTime.strftime("%Y-%m-%d")
+            self.blogBase[listJsonName][postNum]["isoDate"] = thisTime.isoformat()
             self.blogBase[listJsonName][postNum]["dateLabelColor"]=self.blogBase["yearColorList"][int(thisYear)%len(self.blogBase["yearColorList"])]
 
             mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
@@ -555,11 +561,15 @@ for i in blog.blogBase["postListJson"]:
     del blog.blogBase["postListJson"][i]["createdAt"]
     del blog.blogBase["postListJson"][i]["script"]
     del blog.blogBase["postListJson"][i]["style"]
-    del blog.blogBase["postListJson"][i]["top"]
+    del blog.blogBase["pos  tListJson"][i]["top"]
     del blog.blogBase["postListJson"][i]["ogImage"]
 
     if 'head' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["head"]
+    if 'keywords' in blog.blogBase["postListJson"][i]: 
+        del blog.blogBase["postListJson"][i]["keywords"]
+    if 'isoDate' in blog.blogBase["postListJson"][i]: 
+        del blog.blogBase["postListJson"][i]["isoDate"]
     # [关键修正] 修复了错误的变量名
     if 'quote' in blog.blogBase["postListJson"][i]:
         del blog.blogBase["postListJson"][i]["quote"]
