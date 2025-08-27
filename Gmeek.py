@@ -391,19 +391,25 @@ class GMEEK():
             self.blogBase[listJsonName][postNum]["postSourceUrl"]="https://github.com/"+options.repo_name+"/issues/"+str(issue.number)
             self.blogBase[listJsonName][postNum]["commentNum"]=issue.get_comments().totalCount
 
-            if issue.body==None:
-                self.blogBase[listJsonName][postNum]["description"]=''
-                self.blogBase[listJsonName][postNum]["wordCount"]=0
+# [修改] 优先使用自定义 description，否则回退至截取第一句话
+if issue.body==None:
+    self.blogBase[listJsonName][postNum]["description"]=''
+    self.blogBase[listJsonName][postNum]["wordCount"]=0
+else:
+    self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
+    if "description" in postConfig:
+        self.blogBase[listJsonName][postNum]["description"] = postConfig["description"]
+    else:
+        if self.blogBase["rssSplit"]=="sentence":
+            if self.blogBase["i18n"]=="CN":
+                period="。"
             else:
-                self.blogBase[listJsonName][postNum]["wordCount"]=len(issue.body)
-                if self.blogBase["rssSplit"]=="sentence":
-                    if self.blogBase["i18n"]=="CN":
-                        period="。"
-                    else:
-                        period="."
-                else:
-                    period=self.blogBase["rssSplit"]
-                self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
+                period="."
+            self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
+        else:
+            period=self.blogBase["rssSplit"]
+            self.blogBase[listJsonName][postNum]["description"]=issue.body.split(period)[0].replace("\"", "\'")+period
+         
                 
             self.blogBase[listJsonName][postNum]["top"]=0
             for event in issue.get_events():
