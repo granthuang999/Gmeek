@@ -204,7 +204,7 @@ class GMEEK():
         postBase["script"]=issue["script"]
         postBase["head"]=issue["head"]
         postBase["top"]=issue["top"]
-        postBase["postSourceUrl"]=issue["  postSourceUrl"]
+        postBase["postSourceUrl"]=issue["postSourceUrl"]
         postBase["repoName"]=options.repo_name
         postBase["keywords"] = issue.get("keywords")
         postBase["isoDate"] = issue.get("isoDate")
