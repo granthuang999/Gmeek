@@ -94,6 +94,9 @@ class GMEEK():
         self.blogBase["postListJson"]=json.loads('{}')
         self.blogBase["singeListJson"]=json.loads('{}')
         self.blogBase["labelColorDict"]=self.labelColorDict
+     # [新增] 检查并添加导航链接配置
+        if "navLinks" not in self.blogBase:
+            self.blogBase["navLinks"] = []
         if "displayTitle" not in self.blogBase:
             self.blogBase["displayTitle"]=self.blogBase["title"]
 
