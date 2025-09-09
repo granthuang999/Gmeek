@@ -36,7 +36,7 @@ IconBase={
     "check":"M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
 }
 ######################################################################################
-class GMEEK:
+class GMEEK():
     def __init__(self,options):
         self.options=options
         
@@ -61,33 +61,16 @@ class GMEEK:
         
     def cleanFile(self):
         # This function is from your original file, kept for local runs if needed.
-        workspace_path = os.environ.get('GITHUB_WORKSPACE')
-        if os.path.exists(workspace_path+"/"+self.backup_dir):
-            shutil.rmtree(workspace_path+"/"+self.backup_dir)
-
-        if os.path.exists(workspace_path+"/"+self.root_dir):
-            shutil.rmtree(workspace_path+"/"+self.root_dir)
-
-        if os.path.exists(self.backup_dir):
-            shutil.rmtree(self.backup_dir)
-            
-        if os.path.exists(self.root_dir):
-            shutil.rmtree(self.root_dir)
-
-        os.mkdir(self.backup_dir)
-        os.mkdir(self.root_dir)
-        os.mkdir(self.post_dir)
-
+        workspace_path = os.environ.get('GITHUB_WORKSPACE', '.')
+        if os.path.exists(os.path.join(workspace_path, self.backup_dir)):
+            shutil.rmtree(os.path.join(workspace_path, self.backup_dir))
+        if os.path.exists(os.path.join(workspace_path, self.root_dir)):
+            shutil.rmtree(os.path.join(workspace_path, self.root_dir))
+        os.makedirs(self.backup_dir, exist_ok=True)
+        os.makedirs(self.root_dir, exist_ok=True)
+        os.makedirs(self.post_dir, exist_ok=True)
         if os.path.exists(self.static_dir):
-            for item in os.listdir(self.static_dir):
-                src = os.path.join(self.static_dir, item)
-                dst = os.path.join(self.root_dir, item)
-                if os.path.isfile(src):
-                    shutil.copy(src, dst)
-                elif os.path.isdir(src):
-                    shutil.copytree(src, dst)
-        else:
-            print("static does not exist")
+            shutil.copytree(self.static_dir, self.root_dir, dirs_exist_ok=True)
 
     def defaultConfig(self):
         with open('config.json', 'r', encoding='utf-8') as f:
@@ -130,19 +113,20 @@ class GMEEK:
         except requests.RequestException as e:
             raise Exception(f"markdown2html error: {e}")
 
-    def renderHtml(self,template,render_dict,htmlDir,icon=None):
+    def renderHtml(self,template_name, render_dict, html_path, icon=None):
         file_loader = FileSystemLoader('templates')
         env = Environment(loader=file_loader)
         env.filters['tojson'] = json.dumps
-        template = env.get_template(template)
+        template = env.get_template(template_name)
+        # Pass postListJson separately for plist.html compatibility
         postListJson = render_dict.get("postListJson", {})
         output = template.render(blogBase=render_dict, postListJson=postListJson, i18n=self.i18n, IconList=icon or IconBase)
-        with open(htmlDir, 'w', encoding='UTF-8') as f:
+        with open(html_path, 'w', encoding='UTF-8') as f:
             f.write(output)
 
-    def createPostHtml(self,issue_data):
-        mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue_data["postTitle"])
-        md_filepath = os.path.join(self.backup_dir, f"{mdFileName}.md")
+    def createPostHtml(self, issue_data):
+        md_filename = re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue_data["postTitle"])
+        md_filepath = os.path.join(self.backup_dir, f"{md_filename}.md")
         try:
             with open(md_filepath, 'r', encoding='UTF-8') as f:
                 raw_md_content = f.read()
