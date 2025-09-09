@@ -193,7 +193,8 @@ class GMEEK():
             post_body = re.sub(r'<code class="notranslate">Gmeek-html(.*?)</code>', lambda match: html.unescape(match.group(1)), post_body, flags=re.DOTALL)
 
         postBase["postTitle"]=issue["postTitle"]
-        postBase["postUrl"]=self.blogBase["homeUrl"]+"/"+issue["postUrl"]
+        # [修正] postUrl 现在已经是完整的绝对URL
+        postBase["postUrl"]=issue["postUrl"]
         postBase["description"]=issue["description"]
         postBase["ogImage"]=issue["ogImage"]
         postBase["postBody"]=post_body
@@ -243,20 +244,34 @@ class GMEEK():
         pageFlag=0
         while True:
             topNum=pageFlag*self.blogBase["onePageListNum"]
-            print("topNum=%d postNum=%d"%(topNum,postNum))
+            # [新增] 为每个列表页计算并添加自己的 canonicalUrl
+            relative_url = ""
+            if pageFlag == 0:
+                relative_url = ""
+                htmlDir = self.root_dir + "index.html"
+            else:
+                relative_url = f"page{pageFlag + 1}.html"
+                htmlDir = self.root_dir + relative_url
+            
+            # 确保首页URL不包含 'index.html'
+            canonical_url = f"{self.blogBase['homeUrl']}/{relative_url}"
+            if canonical_url.endswith('/index.html'):
+                canonical_url = canonical_url[:-10] #
+            elif canonical_url.endswith('/'):
+                canonical_url = canonical_url[:-1]
+            self.blogBase["canonicalUrl"] = canonical_url
+
             if postNum<=self.blogBase["onePageListNum"]:
                 if pageFlag==0:
                     onePageList=dict(list(self.blogBase["postListJson"].items())[:postNum])
-                    htmlDir=self.root_dir+"index.html"
                     self.blogBase["prevUrl"]="disabled"
                     self.blogBase["nextUrl"]="disabled"
                 else:
                     onePageList=dict(list(self.blogBase["postListJson"].items())[topNum:topNum+postNum])
-                    htmlDir=self.root_dir+("page%d.html" % (pageFlag+1))
                     if pageFlag==1:
                         self.blogBase["prevUrl"]="/index.html"
                     else:
-                        self.blogBase["prevUrl"]="/page%d.html" % pageFlag
+                        self.blogBase["prevUrl"]=f"/page{pageFlag}.html"
                     self.blogBase["nextUrl"]="disabled"
 
                 self.renderHtml('plist.html',self.blogBase,onePageList,htmlDir,plistIcon)
@@ -266,25 +281,25 @@ class GMEEK():
                 onePageList=dict(list(self.blogBase["postListJson"].items())[topNum:topNum+self.blogBase["onePageListNum"]])
                 postNum=postNum-self.blogBase["onePageListNum"]
                 if pageFlag==0:
-                    htmlDir=self.root_dir+"index.html"
                     self.blogBase["prevUrl"]="disabled"
                     self.blogBase["nextUrl"]="/page2.html"
                 else:
-                    htmlDir=self.root_dir+("page%d.html" % (pageFlag+1))
                     if pageFlag==1:
                         self.blogBase["prevUrl"]="/index.html"
                     else:
-                        self.blogBase["prevUrl"]="/page%d.html" % pageFlag
-                    self.blogBase["nextUrl"]="/page%d.html" % (pageFlag+2)
+                        self.blogBase["prevUrl"]=f"/page{pageFlag}.html"
+                    self.blogBase["nextUrl"]=f"/page{pageFlag+2}.html"
 
                 self.renderHtml('plist.html',self.blogBase,onePageList,htmlDir,plistIcon)
                 print("create "+htmlDir)
 
             pageFlag=pageFlag+1
-
+        
+        # [新增] 为 tag 页面添加 canonicalUrl
+        self.blogBase["canonicalUrl"] = f"{self.blogBase['homeUrl']}/tag.html"
         self.renderHtml('tag.html',self.blogBase,onePageList,self.root_dir+"tag.html",tagIcon)
         print("create tag.html")
-
+     
     def createFeedXml(self):
         # [关键修改] 过滤掉时间戳在未来的文章
         current_time = int(time.time())
@@ -386,7 +401,12 @@ class GMEEK():
             self.blogBase[listJsonName][postNum]["htmlDir"]=gen_Html
             self.blogBase[listJsonName][postNum]["labels"]=[label.name for label in issue.labels]
             self.blogBase[listJsonName][postNum]["postTitle"]=issue.title
-            self.blogBase[listJsonName][postNum]["postUrl"]=urllib.parse.quote(gen_Html[len(self.root_dir):])
+            # [关键修正] postUrl 现在总是拼接完整的绝对URL
+            self.blogBase[listJsonName][postNum]["postUrl"] = f"{self.blogBase['homeUrl']}/{urllib.parse.quote(relative_url)}"
+            
+            # [新增] 为非文章页添加 canonicalUrl
+            if is_single_page:
+                self.blogBase[listJsonName][postNum]["canonicalUrl"] = self.blogBase[listJsonName][postNum]["postUrl"]
 
             self.blogBase[listJsonName][postNum]["postSourceUrl"]="https://github.com/"+options.repo_name+"/issues/"+str(issue.number)
             self.blogBase[listJsonName][postNum]["commentNum"]=issue.get_comments().totalCount
