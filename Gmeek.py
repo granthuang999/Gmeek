@@ -37,51 +37,40 @@ IconBase={
 }
 
 class GMEEK:
-    def __init__(self,options):
-        self.options=options
-        self.root_dir='docs/'
-        self.static_dir='static/'
-        self.post_folder='post/'
-        self.backup_dir='backup/'
-        self.post_dir=self.root_dir+self.post_folder
+    def __init__(self, options):
+        self.options = options
+        self.root_dir = 'docs/'
+        self.static_dir = 'static/'
+        self.post_folder = 'post/'
+        self.backup_dir = 'backup/'
+        self.post_dir = self.root_dir + self.post_folder
 
         # 修正：使用新的 Auth 方法以避免 DeprecationWarning
         auth = Auth.Token(self.options.github_token)
-        user = Github(auth=auth)
-        self.repo = self.get_repo(user, options.repo_name)
+        self.github = Github(auth=auth)
+        self.repo = self.github.get_repo(options.repo_name)
         self.feed = FeedGenerator()
-        self.oldFeedString=''
-
-        self.labelColorDict=json.loads('{}')
-        for label in self.repo.get_labels():
-            self.labelColorDict[label.name]='#'+label.color
-        print(self.labelColorDict)
-        self.defaultConfig()
+        self.oldFeedString = ''
         
-    def cleanFile(self):
-        # This function is not used by the workflow, but is kept for local runs.
-        # It's based on your original file's logic.
-        workspace_path = os.environ.get('GITHUB_WORKSPACE', '.')
-        if os.path.exists(os.path.join(workspace_path, self.backup_dir)):
-            shutil.rmtree(os.path.join(workspace_path, self.backup_dir))
-        if os.path.exists(os.path.join(workspace_path, self.root_dir)):
-            shutil.rmtree(os.path.join(workspace_path, self.root_dir))
-        os.makedirs(self.backup_dir, exist_ok=True)
-        os.makedirs(self.root_dir, exist_ok=True)
-        os.makedirs(self.post_dir, exist_ok=True)
-        if os.path.exists(self.static_dir):
-            shutil.copytree(self.static_dir, self.root_dir, dirs_exist_ok=True)
+        self.labelColorDict = {label.name: '#' + label.color for label in self.repo.get_labels()}
+        print("Label Colors:", self.labelColorDict)
+        self.defaultConfig()
 
     def defaultConfig(self):
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
-
-        dconfig={"singlePage":[],"hiddenPage":[],"startSite":"","filingNum":"","onePageListNum":15,"commentLabelColor":"#006b75","yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"],"i18n":"CN","themeMode":"manual","dayTheme":"light","nightTheme":"dark","urlMode":"pinyin","script":"","style":"","head":"","indexScript":"","indexStyle":"","bottomText":"","showPostSource":1,"iconList":{},"UTC":8,"rssSplit":"sentence","exlink":{},"needComment":1,"allHead":""}
         
-        self.blogBase={**dconfig,**config}
-        self.blogBase["postListJson"]={}
-        self.blogBase["singeListJson"]={}
-        self.blogBase["labelColorDict"]=self.labelColorDict
+        dconfig = {"singlePage":[], "hiddenPage":[], "startSite":"", "filingNum":"", "onePageListNum":15, 
+                   "commentLabelColor":"#006b75", "yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"], 
+                   "i18n":"CN", "themeMode":"manual", "dayTheme":"light", "nightTheme":"dark", "urlMode":"pinyin", 
+                   "script":"", "style":"", "head":"", "indexScript":"", "indexStyle":"", "bottomText":"", 
+                   "showPostSource":1, "iconList":{}, "UTC":8, "rssSplit":"sentence", "exlink":{}, 
+                   "needComment":1, "allHead":""}
+        
+        self.blogBase = {**dconfig, **config}
+        self.blogBase["postListJson"] = {}
+        self.blogBase["singeListJson"] = {}
+        self.blogBase["labelColorDict"] = self.labelColorDict
         
         self.blogBase.setdefault("displayTitle", self.blogBase["title"])
         self.blogBase.setdefault("faviconUrl", self.blogBase["avatarUrl"])
@@ -114,14 +103,15 @@ class GMEEK:
         except requests.RequestException as e:
             raise Exception(f"markdown2html error: {e}")
 
-    def renderHtml(self,template,render_dict,htmlDir,icon=None):
+    def renderHtml(self,template_name, render_dict, html_path, icon=None):
         file_loader = FileSystemLoader('templates')
         env = Environment(loader=file_loader)
         env.filters['tojson'] = json.dumps
-        template = env.get_template(template)
+        template = env.get_template(template_name)
+        # Pass postListJson separately for plist.html compatibility
         postListJson = render_dict.get("postListJson", {})
         output = template.render(blogBase=render_dict, postListJson=postListJson, i18n=self.i18n, IconList=icon or IconBase)
-        with open(htmlDir, 'w', encoding='UTF-8') as f:
+        with open(html_path, 'w', encoding='UTF-8') as f:
             f.write(output)
 
     def createPostHtml(self,issue_data):
@@ -214,6 +204,7 @@ class GMEEK:
         fileName = self.createFileName(issue, postConfig, useLabel=is_single_page)
         html_filename = f"{fileName}.html"
         
+        # 关键修复：在此处预先定义 relative_url
         if is_single_page:
             html_dir = self.root_dir + html_filename
             relative_url = html_filename
