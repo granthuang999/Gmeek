@@ -5,7 +5,7 @@ import json
 import time
 import datetime
 import shutil
-import urllib
+import urllib.parse
 import requests
 import argparse
 import html
@@ -15,10 +15,11 @@ from feedgen.feed import FeedGenerator
 from jinja2 import Environment, FileSystemLoader
 from transliterate import translit
 from collections import OrderedDict
-######################################################################################
-i18n={"Search":"Search","switchTheme":"switch theme","home":"home","comments":"comments","run":"run ","days":" days","Previous":"Previous","Next":"Next"}
+
+# --- Constants ---
 i18nCN={"Search":"搜索","switchTheme":"切换主题","home":"首页","comments":"评论","run":"网站运行","days":"天","Previous":"上一页","Next":"下一页"}
 i18nRU={"Search":"Поиск","switchTheme": "Сменить тему","home":"Главная","comments":"Комментарии","run":"работает ","days":" дней","Previous":"Предыдущая","Next":"Следующая"}
+i18n={"Search":"Search","switchTheme":"switch theme","home":"home","comments":"comments","run":"run ","days":" days","Previous":"Previous","Next":"Next"}
 IconBase={
     "post":"M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Zm.75 2.25h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z",
     "link":"m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z",
@@ -34,52 +35,42 @@ IconBase={
     "copy":"M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z",
     "check":"M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"
 }
-######################################################################################
-class GMEEK():
-    def __init__(self,options):
-        self.options=options
-        
-        self.root_dir='docs/'
-        self.static_dir='static/'
-        self.post_folder='post/'
-        self.backup_dir='backup/'
-        self.post_dir=self.root_dir+self.post_folder
+
+class GMEEK:
+    def __init__(self, options):
+        self.options = options
+        self.root_dir = 'docs/'
+        self.static_dir = 'static/'
+        self.post_folder = 'post/'
+        self.backup_dir = 'backup/'
+        self.post_dir = self.root_dir + self.post_folder
 
         # 修正：使用新的 Auth 方法以避免 DeprecationWarning
         auth = Auth.Token(self.options.github_token)
-        user = Github(auth=auth)
-        self.repo = self.get_repo(user, options.repo_name)
+        self.github = Github(auth=auth)
+        self.repo = self.github.get_repo(options.repo_name)
         self.feed = FeedGenerator()
-        self.oldFeedString=''
-
-        self.labelColorDict=json.loads('{}')
-        for label in self.repo.get_labels():
-            self.labelColorDict[label.name]='#'+label.color
-        print(self.labelColorDict)
-        self.defaultConfig()
+        self.oldFeedString = ''
         
-    def cleanFile(self):
-        # This function is primarily for local testing; the workflow handles its own cleanup.
-        if os.path.exists(self.backup_dir):
-            shutil.rmtree(self.backup_dir)
-        if os.path.exists(self.root_dir):
-            shutil.rmtree(self.root_dir)
-        os.mkdir(self.backup_dir)
-        os.mkdir(self.root_dir)
-        os.mkdir(self.post_dir)
-        if os.path.exists(self.static_dir):
-            shutil.copytree(self.static_dir, self.root_dir, dirs_exist_ok=True)
+        self.labelColorDict = {label.name: '#' + label.color for label in self.repo.get_labels()}
+        print("Label Colors:", self.labelColorDict)
+        self.defaultConfig()
 
     def defaultConfig(self):
         with open('config.json', 'r', encoding='utf-8') as f:
             config = json.load(f)
         
-        dconfig={"singlePage":[],"hiddenPage":[],"startSite":"","filingNum":"","onePageListNum":15,"commentLabelColor":"#006b75","yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"],"i18n":"CN","themeMode":"manual","dayTheme":"light","nightTheme":"dark","urlMode":"pinyin","script":"","style":"","head":"","indexScript":"","indexStyle":"","bottomText":"","showPostSource":1,"iconList":{},"UTC":8,"rssSplit":"sentence","exlink":{},"needComment":1,"allHead":""}
+        dconfig = {"singlePage":[], "hiddenPage":[], "startSite":"", "filingNum":"", "onePageListNum":15, 
+                   "commentLabelColor":"#006b75", "yearColorList":["#bc4c00", "#0969da", "#1f883d", "#A333D0"], 
+                   "i18n":"CN", "themeMode":"manual", "dayTheme":"light", "nightTheme":"dark", "urlMode":"pinyin", 
+                   "script":"", "style":"", "head":"", "indexScript":"", "indexStyle":"", "bottomText":"", 
+                   "showPostSource":1, "iconList":{}, "UTC":8, "rssSplit":"sentence", "exlink":{}, 
+                   "needComment":1, "allHead":""}
         
-        self.blogBase={**dconfig,**config}
-        self.blogBase["postListJson"]={}
-        self.blogBase["singeListJson"]={}
-        self.blogBase["labelColorDict"]=self.labelColorDict
+        self.blogBase = {**dconfig, **config}
+        self.blogBase["postListJson"] = {}
+        self.blogBase["singeListJson"] = {}
+        self.blogBase["labelColorDict"] = self.labelColorDict
         
         self.blogBase.setdefault("displayTitle", self.blogBase["title"])
         self.blogBase.setdefault("faviconUrl", self.blogBase["avatarUrl"])
@@ -99,9 +90,6 @@ class GMEEK():
         self.i18n = {"CN": i18nCN, "RU": i18nRU}.get(self.blogBase["i18n"], i18n)
         self.TZ = datetime.timezone(datetime.timedelta(hours=self.blogBase["UTC"]))
 
-    def get_repo(self,user:Github, repo:str):
-        return user.get_repo(repo)
-
     def markdown2html(self, mdstr):
         payload = {"text": mdstr, "mode": "gfm"}
         headers = {"Authorization": f"token {self.options.github_token}"}
@@ -112,20 +100,18 @@ class GMEEK():
         except requests.RequestException as e:
             raise Exception(f"markdown2html error: {e}")
 
-    def renderHtml(self,template,render_dict,htmlDir,icon=None):
+    def renderHtml(self, template_name, render_dict, html_path):
         file_loader = FileSystemLoader('templates')
         env = Environment(loader=file_loader)
         env.filters['tojson'] = json.dumps
-        template = env.get_template(template)
-        # Pass postListJson separately for plist.html compatibility
-        postListJson = render_dict.get("postListJson", {})
-        output = template.render(blogBase=render_dict, postListJson=postListJson, i18n=self.i18n, IconList=icon or IconBase)
-        with open(htmlDir, 'w', encoding='UTF-8') as f:
+        template = env.get_template(template_name)
+        output = template.render(blogBase=render_dict, postListJson=render_dict.get("postListJson",{}), i18n=self.i18n, IconList=IconBase)
+        with open(html_path, 'w', encoding='UTF-8') as f:
             f.write(output)
 
-    def createPostHtml(self,issue_data):
-        mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue_data["postTitle"])
-        md_filepath = os.path.join(self.backup_dir, f"{mdFileName}.md")
+    def createPostHtml(self, issue_data):
+        md_filename = re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue_data["postTitle"])
+        md_filepath = os.path.join(self.backup_dir, f"{md_filename}.md")
 
         try:
             with open(md_filepath, 'r', encoding='UTF-8') as f:
@@ -136,28 +122,12 @@ class GMEEK():
 
         post_body_html = self.markdown2html(raw_md_content)
         
-        render_dict=self.blogBase.copy()
+        render_dict = self.blogBase.copy()
         render_dict.update(issue_data)
-        render_dict["postBody"]=post_body_html
-        
-        # Set the canonical URL for post and single pages
+        render_dict["postBody"] = post_body_html
         render_dict["canonicalUrl"] = issue_data["postUrl"]
 
-        if issue_data["labels"][0] in self.blogBase["singlePage"]:
-            render_dict["bottomText"]=''
-
-        if '<pre class="notranslate">' in post_body_html:
-            keys=['sun','moon','sync','home','github','copy','check']
-            if '<div class="highlight' in post_body_html:
-                render_dict["highlight"]=1
-            else:
-                render_dict["highlight"]=2
-        else:
-            keys=['sun','moon','sync','home','github']
-            render_dict["highlight"]=0
-        
-        postIcon=dict(zip(keys, map(IconBase.get, keys)))
-        self.renderHtml('post.html',render_dict,issue_data["htmlDir"],postIcon)
+        self.renderHtml('post.html', render_dict, issue_data["htmlDir"])
         print(f"Created page: title={issue_data['postTitle']}, file={issue_data['htmlDir']}")
 
     def createPlistHtml(self):
@@ -192,7 +162,7 @@ class GMEEK():
 
         tag_render_dict = self.blogBase.copy()
         tag_render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/tag.html"
-        tag_render_dict["postListJson"] = sorted_posts # Pass all posts to tag page
+        tag_render_dict["postListJson"] = sorted_posts
         self.renderHtml('tag.html', tag_render_dict, f"{self.root_dir}tag.html")
         print("Created tag.html")
         
@@ -237,7 +207,7 @@ class GMEEK():
             "top": 0 # Default value
         }
         
-        # 关键修复：使用原来的、正确的逻辑来判断置顶
+        # 关键修复：使用你原来版本中正确的循环逻辑来判断置顶
         for event in issue.get_events():
             if event.event == "pinned":
                 post_data["top"] = 1
@@ -283,10 +253,35 @@ class GMEEK():
             return Pinyin().get_pinyin(issue.title)
 
     def createFeedXml(self):
-        # This function can be filled in based on your original logic
-        # For now, it's a placeholder to avoid breaking the script
-        print("====== skipping rss xml creation in this version ======")
-        pass
+        print("====== create rss xml ======")
+        current_time = int(time.time())
+        # Sort posts by creation date for the feed
+        published_posts = {k: v for k, v in self.blogBase["postListJson"].items() if v["createdAt"] <= current_time}
+        sorted_posts = dict(sorted(published_posts.items(), key=lambda x: x[1]["createdAt"], reverse=True))
+
+        feed = FeedGenerator()
+        feed.title(self.blogBase["title"])
+        feed.description(self.blogBase["subTitle"])
+        feed.link(href=self.blogBase["homeUrl"])
+        feed.image(url=self.blogBase["homeUrl"] + self.blogBase["avatarUrl"], title="avatar", link=self.blogBase["homeUrl"])
+        feed.copyright(self.blogBase["title"])
+        feed.managingEditor(self.blogBase["title"])
+        feed.webMaster(self.blogBase["title"])
+        feed.ttl("60")
+
+        # Combine and sort all pages for the feed
+        all_content = list(self.blogBase["singeListJson"].values()) + list(sorted_posts.values())
+        all_content.sort(key=lambda x: x["createdAt"], reverse=True)
+
+        for item_data in all_content:
+            fe = feed.add_item()
+            fe.guid(item_data["postUrl"], permalink=True)
+            fe.title(item_data["postTitle"])
+            fe.description(item_data["description"])
+            fe.link(href=item_data["postUrl"])
+            fe.pubDate(datetime.datetime.fromtimestamp(item_data["createdAt"], tz=datetime.timezone.utc))
+        
+        feed.rss_file(os.path.join(self.root_dir, 'rss.xml'), pretty=True)
 
     def runAll(self):
         print("====== start create static html ======")
@@ -353,28 +348,26 @@ if __name__ == '__main__':
     with open("blogBase.json", "w", encoding='utf-8') as f:
         json.dump(blog.blogBase, f, ensure_ascii=False, indent=2)
 
-    # Simplified postList.json creation logic
     print("====== create postList.json file ======")
-    post_list_data = {}
     current_time = int(time.time())
     
-    published_posts = {k: v for k, v in blog.blogBase["postListJson"].items() if v["createdAt"] <= current_time}
-    sorted_posts = dict(sorted(published_posts.items(), key=lambda item: item[1]['createdAt'], reverse=True))
+    published_posts = {k: v for k, v in blog.blogBase["postListJson"].items() if v.get("createdAt", 0) <= current_time}
+    sorted_posts_items = sorted(published_posts.items(), key=lambda item: item[1]['createdAt'], reverse=True)
     
-    for post_id, post_data in sorted_posts.items():
-        post_list_data[post_id] = {
+    final_post_list = OrderedDict()
+    for post_id, post_data in sorted_posts_items:
+        final_post_list[post_id] = {
             "postTitle": post_data.get("postTitle"),
             "labels": post_data.get("labels"),
             "createdDate": post_data.get("createdDate"),
             "postUrl": post_data.get("postUrl", "").replace(blog.blogBase["homeUrl"] + "/", "")
         }
 
-    post_list_data["labelColorDict"] = blog.labelColorDict
+    final_post_list["labelColorDict"] = blog.labelColorDict
     
     with open(os.path.join(blog.root_dir, "postList.json"), "w", encoding='utf-8') as f:
-        json.dump(post_list_data, f, ensure_ascii=False)
-
-    # README update logic from your original file
+        json.dump(final_post_list, f, ensure_ascii=False)
+    
     if os.environ.get('GITHUB_EVENT_NAME') != 'schedule':
         print("====== update readme file ======")
         workspace_path = os.environ.get('GITHUB_WORKSPACE', '.')
