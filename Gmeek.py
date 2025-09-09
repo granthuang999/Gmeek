@@ -323,6 +323,10 @@ class GMEEK():
             self.createPostHtml(page_data)
 
         self.createPlistHtml()
+        # --- 在这里添加下面这行代码 ---
+        self.renderHtml('pansou.html', self.blogBase, f"{self.root_dir}pansou.html")
+        print("Created pansou.html")
+        # ---------------------------
         self.createFeedXml()
         
         print("====== create static html end ======")
