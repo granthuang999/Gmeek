@@ -114,9 +114,9 @@ class GMEEK:
         with open(html_path, 'w', encoding='UTF-8') as f:
             f.write(output)
 
-    def createPostHtml(self,issue_data):
-        mdFileName=re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue_data["postTitle"])
-        md_filepath = os.path.join(self.backup_dir, f"{mdFileName}.md")
+    def createPostHtml(self, issue_data):
+        md_filename = re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue_data["postTitle"])
+        md_filepath = os.path.join(self.backup_dir, f"{md_filename}.md")
         try:
             with open(md_filepath, 'r', encoding='UTF-8') as f:
                 raw_md_content = f.read()
@@ -270,15 +270,12 @@ class GMEEK:
             return Pinyin().get_pinyin(issue.title)
 
     def createFeedXml(self):
+        # 关键修复：恢复你原始文件中的RSS生成逻辑
         print("====== create rss xml ======")
         current_time = int(time.time())
         
-        all_posts_list = list(self.blogBase["postListJson"].values())
-        all_single_list = list(self.blogBase["singeListJson"].values())
-        all_content = all_posts_list + all_single_list
-        
-        published_content = [p for p in all_content if p.get("createdAt", 0) <= current_time]
-        sorted_content = sorted(published_content, key=lambda x: x["createdAt"], reverse=True)
+        published_posts = {k: v for k, v in self.blogBase["postListJson"].items() if v["createdAt"] <= current_time}
+        sorted_posts_for_feed = dict(sorted(published_posts.items(),key=lambda x:x[1]["createdAt"],reverse=True))
 
         feed = FeedGenerator()
         feed.title(self.blogBase["title"])
@@ -290,19 +287,26 @@ class GMEEK:
         feed.webMaster(self.blogBase["title"])
         feed.ttl("60")
 
-        for item_data in sorted_content:
-            fe = feed.add_item()
-            fe.guid(item_data["postUrl"], permalink=True)
-            fe.title(item_data["postTitle"])
-            fe.description(item_data["description"])
-            fe.link(href=item_data["postUrl"])
-            fe.pubDate(datetime.datetime.fromtimestamp(item_data["createdAt"], tz=datetime.timezone.utc))
+        all_content_for_feed = list(self.blogBase["singeListJson"].values()) + list(sorted_posts_for_feed.values())
+        all_content_for_feed.sort(key=lambda x: x["createdAt"], reverse=True)
         
+        for item_data in all_content_for_feed:
+            item = feed.add_item()
+            item.guid(item_data["postUrl"], permalink=True)
+            item.title(item_data["postTitle"])
+            item.description(item_data["description"])
+            item.link(href=item_data["postUrl"])
+            item.pubDate(datetime.datetime.fromtimestamp(item_data["createdAt"], tz=datetime.timezone.utc))
+
         feed.rss_file(os.path.join(self.root_dir, 'rss.xml'), pretty=True)
 
     def runAll(self):
         print("====== start create static html ======")
-        self.cleanFile()
+        # cleanFile is now handled by the workflow to protect state files
+        os.makedirs(self.backup_dir, exist_ok=True)
+        os.makedirs(self.post_dir, exist_ok=True)
+        if os.path.exists(self.static_dir):
+            shutil.copytree(self.static_dir, self.root_dir, dirs_exist_ok=True)
 
         issues = self.repo.get_issues(state='open')
         for issue in issues:
@@ -362,39 +366,50 @@ if __name__ == '__main__':
     with open("blogBase.json", "w", encoding='utf-8') as f:
         json.dump(blog.blogBase, f, ensure_ascii=False, indent=2)
 
+    # Re-using your original logic for postList.json and README update
     print("====== create postList.json file ======")
     current_time = int(time.time())
-    
-    published_posts = {k: v for k, v in blog.blogBase["postListJson"].items() if v.get("createdAt", 0) <= current_time}
-    sorted_posts_items = sorted(published_posts.items(), key=lambda item: item[1]['createdAt'], reverse=True)
-    
-    final_post_list = OrderedDict()
-    for post_id, post_data in sorted_posts_items:
-        final_post_list[post_id] = {
-            "postTitle": post_data.get("postTitle"),
-            "labels": post_data.get("labels"),
-            "createdDate": post_data.get("createdDate"),
-            "postUrl": post_data.get("postUrl", "").replace(blog.blogBase["homeUrl"] + "/", "")
-        }
+    published_posts = {k: v for k, v in blog.blogBase["postListJson"].items() if v["createdAt"] <= current_time}
+    blog.blogBase["postListJson"] = dict(sorted(published_posts.items(), key=lambda x:x[1]["createdAt"], reverse=True))
 
-    final_post_list["labelColorDict"] = blog.labelColorDict
+    commentNumSum=0
+    wordCount=0
+    for i in list(blog.blogBase["postListJson"].keys()):
+        # Pruning logic from your original file
+        del blog.blogBase["postListJson"][i]["description"]
+        del blog.blogBase["postListJson"][i]["postSourceUrl"]
+        del blog.blogBase["postListJson"][i]["htmlDir"]
+        del blog.blogBase["postListJson"][i]["createdAt"]
+        del blog.blogBase["postListJson"][i]["script"]
+        del blog.blogBase["postListJson"][i]["style"]
+        del blog.blogBase["postListJson"][i]["top"]
+        del blog.blogBase["postListJson"][i]["ogImage"]
+        if 'head' in blog.blogBase["postListJson"][i]: del blog.blogBase["postListJson"][i]["head"]
+        if 'keywords' in blog.blogBase["postListJson"][i]: del blog.blogBase["postListJson"][i]["keywords"]
+        if 'isoDate' in blog.blogBase["postListJson"][i]: del blog.blogBase["postListJson"][i]["isoDate"]
+        if 'quote' in blog.blogBase["postListJson"][i]: del blog.blogBase["postListJson"][i]["quote"]
+        if 'daily_sentence' in blog.blogBase["postListJson"][i]: del blog.blogBase["postListJson"][i]["daily_sentence"]
+        if 'commentNum' in blog.blogBase["postListJson"][i]:
+            commentNumSum += blog.blogBase["postListJson"][i]["commentNum"]
+            del blog.blogBase["postListJson"][i]["commentNum"]
+        if 'wordCount' in blog.blogBase["postListJson"][i]:
+            wordCount += blog.blogBase["postListJson"][i]["wordCount"]
+            del blog.blogBase["postListJson"][i]["wordCount"]
     
-    with open(os.path.join(blog.root_dir, "postList.json"), "w", encoding='utf-8') as f:
-        json.dump(final_post_list, f, ensure_ascii=False)
-    
+    blog.blogBase["postListJson"]["labelColorDict"]=blog.labelColorDict
+    with open(os.path.join(blog.root_dir, "postList.json"), "w") as f:
+        json.dump(blog.blogBase["postListJson"], f, ensure_ascii=False)
+
     if os.environ.get('GITHUB_EVENT_NAME') != 'schedule':
         print("====== update readme file ======")
         workspace_path = os.environ.get('GITHUB_WORKSPACE', '.')
         post_count = len(published_posts)
-        comment_count = sum(p.get("commentNum", 0) for p in published_posts.values())
-        word_count = sum(p.get("wordCount", 0) for p in published_posts.values())
-
         readme = (
             f"# {blog.blogBase['title']} :link: {blog.blogBase['homeUrl']} \r\n"
             f"## [网站调试日志]({blog.blogBase['homeUrl']}/post/debugging-log.html)\r\n"
             f"### :page_facing_up: [{post_count}]({blog.blogBase['homeUrl']}/tag.html) \r\n"
-            f"### :speech_balloon: {comment_count} \r\n"
-            f"### :hibiscus: {word_count} \r\n"
+            f"### :speech_balloon: {commentNumSum} \r\n"
+            f"### :hibiscus: {wordCount} \r\n"
             f"### :alarm_clock: {datetime.datetime.now(blog.TZ).strftime('%Y-%m-%d %H:%M:%S')} \r\n"
             f"### Powered by :heart: [疯子]({blog.blogBase['homeUrl']})\r\n"
         )
