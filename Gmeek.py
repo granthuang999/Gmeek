@@ -192,6 +192,12 @@ class GMEEK():
         self.renderHtml('tag.html', tag_render_dict, f"{self.root_dir}tag.html")
         print("Created tag.html")
         
+        pansou_render_dict = self.blogBase.copy()
+        pansou_render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl’]}/pansou.html"
+        pansou_render_dict["postListJson"] = sorted_posts
+        self.renderHtml('pansou.html', pansou_render_dict, f"{self.root_dir}pansou.html")
+        print("Created pansou.html")
+
     def addOnePostJson(self, issue):
         postConfig = {}
         if issue.body:
