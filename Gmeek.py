@@ -142,6 +142,7 @@ class GMEEK:
         if issue_data["labels"][0] in self.blogBase["singlePage"]:
             render_dict["bottomText"]=''
 
+        # [还原] 恢复您原来版本中关于代码高亮检测和图标加载的逻辑
         if '<pre class="notranslate">' in render_dict["postBody"]:
             keys=['sun','moon','sync','home','github','copy','check']
             if '<div class="highlight' in render_dict["postBody"]:
@@ -192,79 +193,77 @@ class GMEEK:
         self.renderHtml('tag.html', tag_render_dict, f"{self.root_dir}tag.html")
         print("Created tag.html")
         
-# [请用这个新版本完整替换旧的 addOnePostJson 函数]
-def addOnePostJson(self, issue):
-    postConfig = {}
-    body_content = issue.body or "" # [修改] 先将 issue.body 存入一个变量
+    def addOnePostJson(self, issue):
+        # [已包含] 这是移除JSON块的最新版本
+        postConfig = {}
+        body_content = issue.body or ""
 
-    if body_content:
-        lines = body_content.splitlines()
-        last_meaningful_line = next((line.strip() for line in reversed(lines) if line.strip()), "")
-        if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
-            try:
-                postConfig = json.loads(last_meaningful_line[2:])
-                # [关键新增] 如果成功解析了JSON，就从文章内容中移除这一行
-                # 使用 rstrip() 来移除可能存在的尾部空白字符
-                body_content = body_content.rstrip().removesuffix(last_meaningful_line.strip())
-            except json.JSONDecodeError:
-                postConfig = {}
+        if body_content:
+            lines = body_content.splitlines()
+            last_meaningful_line = next((line.strip() for line in reversed(lines) if line.strip()), "")
+            if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
+                try:
+                    postConfig = json.loads(last_meaningful_line[2:])
+                    body_content = body_content.rstrip().removesuffix(last_meaningful_line.strip())
+                except json.JSONDecodeError:
+                    postConfig = {}
 
-    if not issue.labels:
-        print(f"Skipping issue #{issue.number} because it has no labels.")
-        return
+        if not issue.labels:
+            print(f"Skipping issue #{issue.number} because it has no labels.")
+            return
 
-    label_name = issue.labels[0].name
-    is_single_page = label_name in self.blogBase["singlePage"] or label_name in self.blogBase["hiddenPage"]
-    listJsonName = 'singeListJson' if is_single_page else 'postListJson'
+        label_name = issue.labels[0].name
+        is_single_page = label_name in self.blogBase["singlePage"] or label_name in self.blogBase["hiddenPage"]
+        listJsonName = 'singeListJson' if is_single_page else 'postListJson'
 
-    fileName = self.createFileName(issue, postConfig, useLabel=is_single_page)
-    html_filename = f"{fileName}.html"
-    
-    if is_single_page:
-        html_dir = self.root_dir + html_filename
-        relative_url = html_filename
-    else:
-        html_dir = self.post_dir + html_filename
-        relative_url = self.post_folder + html_filename
-    
-    post_data = {
-        "htmlDir": html_dir,
-        "labels": [label.name for label in issue.labels],
-        "postTitle": issue.title,
-        "postUrl": f"{self.blogBase['homeUrl']}/{urllib.parse.quote(relative_url)}",
-        "postSourceUrl": issue.html_url,
-        "commentNum": issue.comments,
-        "wordCount": len(body_content), # [修改] 使用清理后的 body_content 计算字数
-        "createdAt": int(postConfig.get("timestamp", time.mktime(issue.created_at.timetuple()))),
-        "top": 0
-    }
-    
-    for event in issue.get_events():
-        if event.event == "pinned":
-            post_data["top"] = 1
-        elif event.event == "unpinned":
-            post_data["top"] = 0
-    
-    if "description" in postConfig:
-        post_data["description"] = postConfig["description"]
-    else:
-        period = "。" if self.blogBase["i18n"] == "CN" else "."
-        first_sentence = body_content.split(period)[0]
-        post_data["description"] = first_sentence.replace("\"", "\'") + period
-    
-    thisTime = datetime.datetime.fromtimestamp(post_data["createdAt"], tz=self.TZ)
-    post_data["createdDate"] = thisTime.strftime("%Y-%m-%d")
-    post_data["isoDate"] = thisTime.isoformat()
-    post_data["dateLabelColor"] = self.blogBase["yearColorList"][thisTime.year % len(self.blogBase["yearColorList"])]
+        fileName = self.createFileName(issue, postConfig, useLabel=is_single_page)
+        html_filename = f"{fileName}.html"
+        
+        if is_single_page:
+            html_dir = self.root_dir + html_filename
+            relative_url = html_filename
+        else:
+            html_dir = self.post_dir + html_filename
+            relative_url = self.post_folder + html_filename
+        
+        post_data = {
+            "htmlDir": html_dir,
+            "labels": [label.name for label in issue.labels],
+            "postTitle": issue.title,
+            "postUrl": f"{self.blogBase['homeUrl']}/{urllib.parse.quote(relative_url)}",
+            "postSourceUrl": issue.html_url,
+            "commentNum": issue.comments,
+            "wordCount": len(body_content),
+            "createdAt": int(postConfig.get("timestamp", time.mktime(issue.created_at.timetuple()))),
+            "top": 0
+        }
+        
+        for event in issue.get_events():
+            if event.event == "pinned":
+                post_data["top"] = 1
+            elif event.event == "unpinned":
+                post_data["top"] = 0
+        
+        if "description" in postConfig:
+            post_data["description"] = postConfig["description"]
+        else:
+            period = "。" if self.blogBase["i18n"] == "CN" else "."
+            first_sentence = body_content.split(period)[0]
+            post_data["description"] = first_sentence.replace("\"", "\'") + period
+        
+        thisTime = datetime.datetime.fromtimestamp(post_data["createdAt"], tz=self.TZ)
+        post_data["createdDate"] = thisTime.strftime("%Y-%m-%d")
+        post_data["isoDate"] = thisTime.isoformat()
+        post_data["dateLabelColor"] = self.blogBase["yearColorList"][thisTime.year % len(self.blogBase["yearColorList"])]
 
-    for key in ["style", "script", "head", "ogImage", "keywords", "quote", "daily_sentence"]:
-        post_data[key] = postConfig.get(key, self.blogBase.get(key, ""))
-    
-    self.blogBase[listJsonName][f"P{issue.number}"] = post_data
+        for key in ["style", "script", "head", "ogImage", "keywords", "quote", "daily_sentence"]:
+            post_data[key] = postConfig.get(key, self.blogBase.get(key, ""))
+        
+        self.blogBase[listJsonName][f"P{issue.number}"] = post_data
 
-    mdFileName = re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
-    with open(os.path.join(self.backup_dir, f"{mdFileName}.md"), 'w', encoding='UTF-8') as f:
-        f.write(body_content) # [修改] 将清理后的 body_content 写入文件
+        mdFileName = re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
+        with open(os.path.join(self.backup_dir, f"{mdFileName}.md"), 'w', encoding='UTF-8') as f:
+            f.write(body_content)
 
     def createFileName(self, issue, postConfig, useLabel=False):
         if useLabel:
@@ -279,11 +278,10 @@ def addOnePostJson(self, issue):
             return str(issue.number)
         elif url_mode == "ru_translit":
             return str(translit(issue.title, language_code='ru', reversed=True)).replace(' ', '-')
-        else: # Default to pinyin
+        else:
             return Pinyin().get_pinyin(issue.title)
 
     def createFeedXml(self):
-        # 关键修复：恢复你原始文件中的RSS生成逻辑
         print("====== create rss xml ======")
         current_time = int(time.time())
         
@@ -313,6 +311,7 @@ def addOnePostJson(self, issue):
         
         feed.rss_file(os.path.join(self.root_dir, 'rss.xml'), pretty=True)
 
+    # [修正] 修正缩进，使其作为 GMEEK 类的方法
     def runAll(self):
         print("====== start create static html ======")
         self.cleanFile()
@@ -327,7 +326,6 @@ def addOnePostJson(self, issue):
 
         self.createPlistHtml()
         
-        # 新增：确保 pansou.html 也被渲染
         pansou_render_dict = self.blogBase.copy()
         pansou_render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/pansou.html"
         self.renderHtml('pansou.html', pansou_render_dict, f"{self.root_dir}pansou.html")
@@ -337,6 +335,7 @@ def addOnePostJson(self, issue):
         
         print("====== create static html end ======")
     
+    # [修正] 修正缩进，将其作为 GMEEK 类的方法
     def runOne(self, number_str):
         print(f"====== start create static html for issue {number_str} ======")
         issue = self.repo.get_issue(int(number_str))
