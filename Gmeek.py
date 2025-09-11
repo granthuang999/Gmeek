@@ -192,76 +192,79 @@ class GMEEK:
         self.renderHtml('tag.html', tag_render_dict, f"{self.root_dir}tag.html")
         print("Created tag.html")
         
-    def addOnePostJson(self, issue):
-        postConfig = {}
-        if issue.body:
-            lines = issue.body.splitlines()
-            last_meaningful_line = next((line.strip() for line in reversed(lines) if line.strip()), "")
-            if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
-                try:
-                    postConfig = json.loads(last_meaningful_line[2:])
-                except json.JSONDecodeError:
-                    postConfig = {}
+# [请用这个新版本完整替换旧的 addOnePostJson 函数]
+def addOnePostJson(self, issue):
+    postConfig = {}
+    body_content = issue.body or "" # [修改] 先将 issue.body 存入一个变量
 
-        if not issue.labels:
-            print(f"Skipping issue #{issue.number} because it has no labels.")
-            return
+    if body_content:
+        lines = body_content.splitlines()
+        last_meaningful_line = next((line.strip() for line in reversed(lines) if line.strip()), "")
+        if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
+            try:
+                postConfig = json.loads(last_meaningful_line[2:])
+                # [关键新增] 如果成功解析了JSON，就从文章内容中移除这一行
+                # 使用 rstrip() 来移除可能存在的尾部空白字符
+                body_content = body_content.rstrip().removesuffix(last_meaningful_line.strip())
+            except json.JSONDecodeError:
+                postConfig = {}
 
-        label_name = issue.labels[0].name
-        is_single_page = label_name in self.blogBase["singlePage"] or label_name in self.blogBase["hiddenPage"]
-        listJsonName = 'singeListJson' if is_single_page else 'postListJson'
+    if not issue.labels:
+        print(f"Skipping issue #{issue.number} because it has no labels.")
+        return
 
-        fileName = self.createFileName(issue, postConfig, useLabel=is_single_page)
-        html_filename = f"{fileName}.html"
-        
-        # 关键修复：在此处预先定义 relative_url
-        if is_single_page:
-            html_dir = self.root_dir + html_filename
-            relative_url = html_filename
-        else:
-            html_dir = self.post_dir + html_filename
-            relative_url = self.post_folder + html_filename
-        
-        post_data = {
-            "htmlDir": html_dir,
-            "labels": [label.name for label in issue.labels],
-            "postTitle": issue.title,
-            "postUrl": f"{self.blogBase['homeUrl']}/{urllib.parse.quote(relative_url)}",
-            "postSourceUrl": issue.html_url,
-            "commentNum": issue.comments,
-            "wordCount": len(issue.body or ""),
-            "createdAt": int(postConfig.get("timestamp", time.mktime(issue.created_at.timetuple()))),
-            "top": 0 # Default value, will be updated below
-        }
-        
-        # 关键修复：使用你原来版本中正确的循环逻辑来判断置顶
-        for event in issue.get_events():
-            if event.event == "pinned":
-                post_data["top"] = 1
-            elif event.event == "unpinned":
-                post_data["top"] = 0
-        
-        body = issue.body or ""
-        if "description" in postConfig:
-            post_data["description"] = postConfig["description"]
-        else:
-            period = "。" if self.blogBase["i18n"] == "CN" else "."
-            first_sentence = body.split(period)[0]
-            post_data["description"] = first_sentence.replace("\"", "\'") + period
-        
-        thisTime = datetime.datetime.fromtimestamp(post_data["createdAt"], tz=self.TZ)
-        post_data["createdDate"] = thisTime.strftime("%Y-%m-%d")
-        post_data["isoDate"] = thisTime.isoformat()
-        post_data["dateLabelColor"] = self.blogBase["yearColorList"][thisTime.year % len(self.blogBase["yearColorList"])]
+    label_name = issue.labels[0].name
+    is_single_page = label_name in self.blogBase["singlePage"] or label_name in self.blogBase["hiddenPage"]
+    listJsonName = 'singeListJson' if is_single_page else 'postListJson'
 
-        for key in ["style", "script", "head", "ogImage", "keywords", "quote", "daily_sentence"]:
-            post_data[key] = postConfig.get(key, self.blogBase.get(key, ""))
-        
-        self.blogBase[listJsonName][f"P{issue.number}"] = post_data
+    fileName = self.createFileName(issue, postConfig, useLabel=is_single_page)
+    html_filename = f"{fileName}.html"
+    
+    if is_single_page:
+        html_dir = self.root_dir + html_filename
+        relative_url = html_filename
+    else:
+        html_dir = self.post_dir + html_filename
+        relative_url = self.post_folder + html_filename
+    
+    post_data = {
+        "htmlDir": html_dir,
+        "labels": [label.name for label in issue.labels],
+        "postTitle": issue.title,
+        "postUrl": f"{self.blogBase['homeUrl']}/{urllib.parse.quote(relative_url)}",
+        "postSourceUrl": issue.html_url,
+        "commentNum": issue.comments,
+        "wordCount": len(body_content), # [修改] 使用清理后的 body_content 计算字数
+        "createdAt": int(postConfig.get("timestamp", time.mktime(issue.created_at.timetuple()))),
+        "top": 0
+    }
+    
+    for event in issue.get_events():
+        if event.event == "pinned":
+            post_data["top"] = 1
+        elif event.event == "unpinned":
+            post_data["top"] = 0
+    
+    if "description" in postConfig:
+        post_data["description"] = postConfig["description"]
+    else:
+        period = "。" if self.blogBase["i18n"] == "CN" else "."
+        first_sentence = body_content.split(period)[0]
+        post_data["description"] = first_sentence.replace("\"", "\'") + period
+    
+    thisTime = datetime.datetime.fromtimestamp(post_data["createdAt"], tz=self.TZ)
+    post_data["createdDate"] = thisTime.strftime("%Y-%m-%d")
+    post_data["isoDate"] = thisTime.isoformat()
+    post_data["dateLabelColor"] = self.blogBase["yearColorList"][thisTime.year % len(self.blogBase["yearColorList"])]
 
-        mdFileName = re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
-        with open(os.path.join(self.backup_dir, f"{mdFileName}.md"), 'w', encoding='UTF-8') as f:
-            f.write(body)
+    for key in ["style", "script", "head", "ogImage", "keywords", "quote", "daily_sentence"]:
+        post_data[key] = postConfig.get(key, self.blogBase.get(key, ""))
+    
+    self.blogBase[listJsonName][f"P{issue.number}"] = post_data
+
+    mdFileName = re.sub(r'[<>:/\\|?*\"]|[\0-\31]', '-', issue.title)
+    with open(os.path.join(self.backup_dir, f"{mdFileName}.md"), 'w', encoding='UTF-8') as f:
+        f.write(body_content) # [修改] 将清理后的 body_content 写入文件
 
     def createFileName(self, issue, postConfig, useLabel=False):
         if useLabel:
