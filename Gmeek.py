@@ -67,8 +67,14 @@ class GMEEK:
         os.makedirs(self.backup_dir, exist_ok=True)
         os.makedirs(self.root_dir, exist_ok=True)
         os.makedirs(self.post_dir, exist_ok=True)
+        
         if os.path.exists(self.static_dir):
             shutil.copytree(self.static_dir, self.root_dir, dirs_exist_ok=True)
+        
+        image_dir = 'images'
+        if os.path.exists(image_dir):
+            shutil.copytree(image_dir, os.path.join(self.root_dir, image_dir), dirs_exist_ok=True)
+            print(f"Copied '{image_dir}' directory to '{self.root_dir}'")
 
     def defaultConfig(self):
         with open('config.json', 'r', encoding='utf-8') as f:
@@ -116,8 +122,7 @@ class GMEEK:
         env = Environment(loader=file_loader)
         env.filters['tojson'] = json.dumps
         template = env.get_template(template)
-        postListJson = render_dict.get("postListJson", {})
-        output = template.render(blogBase=render_dict, postListJson=postListJson, i18n=self.i18n, IconList=icon or IconBase)
+        output = template.render(blogBase=render_dict, i18n=self.i18n, IconList=icon or IconBase)
         with open(htmlDir, 'w', encoding='UTF-8') as f:
             f.write(output)
 
@@ -183,12 +188,6 @@ class GMEEK:
             self.renderHtml('plist.html', render_dict, html_path)
             print(f"Created list page: {html_path}")
 
-        tag_render_dict = self.blogBase.copy()
-        tag_render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/tag.html"
-        tag_render_dict["postListJson"] = sorted_posts
-        self.renderHtml('tag.html', tag_render_dict, f"{self.root_dir}tag.html")
-        print("Created tag.html")
-        
     def addOnePostJson(self, issue):
         postConfig = {}
         body_content = issue.body or ""
@@ -199,7 +198,6 @@ class GMEEK:
             if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
                 try:
                     postConfig = json.loads(last_meaningful_line[2:])
-                    # [修正] 使用兼容Python 3.8的方式移除末尾字符串
                     suffix_to_remove = last_meaningful_line.strip()
                     cleaned_body = body_content.rstrip()
                     if cleaned_body.endswith(suffix_to_remove):
@@ -308,10 +306,9 @@ class GMEEK:
             item.link(href=item_data["postUrl"])
             item.pubDate(datetime.datetime.fromtimestamp(item_data["createdAt"], tz=datetime.timezone.utc))
             
-            # [关键新增] 添加文章图片到RSS item
             if item_data.get("ogImage"):
                 image_url = item_data["ogImage"]
-                mime_type = 'image/jpeg'  # 默认MIME类型
+                mime_type = 'image/jpeg'
                 if image_url.lower().endswith('.png'):
                     mime_type = 'image/png'
                 elif image_url.lower().endswith('.gif'):
@@ -319,6 +316,65 @@ class GMEEK:
                 item.enclosure(url=image_url, length='0', type=mime_type)
         
         feed.rss_file(os.path.join(self.root_dir, 'rss.xml'), pretty=True)
+
+    # [新增] 负责生成标签云页面
+    def createTagCloudPage(self):
+        print("====== create tag cloud page ======")
+        all_posts = list(self.blogBase["postListJson"].values())
+        tag_info = {}
+        max_count = 0
+
+        p = Pinyin()
+        for post in all_posts:
+            for label in post['labels']:
+                if label not in self.blogBase['singlePage'] and label not in self.blogBase['hiddenPage']:
+                    if label in tag_info:
+                        tag_info[label]['count'] += 1
+                    else:
+                        filename = f"{p.get_pinyin(label)}.html"
+                        tag_info[label] = {
+                            'count': 1,
+                            'url': f"{self.blogBase['homeUrl']}/{filename}"
+                        }
+        
+        if tag_info:
+            max_count = max(info['count'] for info in tag_info.values())
+
+        render_dict = self.blogBase.copy()
+        render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/tag.html"
+        render_dict["tag_info"] = OrderedDict(sorted(tag_info.items()))
+        render_dict["maxTagsCount"] = max_count
+        
+        self.renderHtml('tag.html', render_dict, f"{self.root_dir}tag.html")
+        print("Created tag.html (Cloud Page)")
+        
+    # [新增] 负责生成所有独立的标签页面
+    def createTagPages(self):
+        print("====== create single tag pages ======")
+        all_posts = list(self.blogBase["postListJson"].values())
+        all_tags = set()
+        for post in all_posts:
+            for label in post['labels']:
+                if label not in self.blogBase['singlePage'] and label not in self.blogBase['hiddenPage']:
+                    all_tags.add(label)
+
+        p = Pinyin()
+        for tag in all_tags:
+            posts_for_this_tag = sorted(
+                [p for p in all_posts if tag in p['labels']],
+                key=lambda x: x['createdAt'],
+                reverse=True
+            )
+            
+            filename = f"{p.get_pinyin(tag)}.html"
+            
+            render_dict = self.blogBase.copy()
+            render_dict["current_tag_name"] = tag
+            render_dict["posts_for_tag"] = posts_for_this_tag
+            render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/{filename}"
+            
+            self.renderHtml('tag_single.html', render_dict, f"{self.root_dir}{filename}")
+            print(f"Created single tag page: {filename}")
 
     def runAll(self):
         print("====== start create static html ======")
@@ -333,6 +389,8 @@ class GMEEK:
             self.createPostHtml(page_data)
 
         self.createPlistHtml()
+        self.createTagCloudPage()
+        self.createTagPages()
         
         pansou_render_dict = self.blogBase.copy()
         pansou_render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/pansou.html"
@@ -357,6 +415,8 @@ class GMEEK:
                  self.createPostHtml(self.blogBase[listJsonName][f"P{number_str}"])
 
             self.createPlistHtml()
+            self.createTagCloudPage()
+            self.createTagPages()
             self.createFeedXml()
             print("====== create static html end ======")
         else:
