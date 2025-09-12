@@ -117,13 +117,11 @@ class GMEEK:
         except requests.RequestException as e:
             raise Exception(f"markdown2html error: {e}")
 
-    # [修正] 明确区分传递给模板的变量
     def renderHtml(self,template_name, context, html_dir):
         file_loader = FileSystemLoader('templates')
         env = Environment(loader=file_loader)
         env.filters['tojson'] = json.dumps
         template = env.get_template(template_name)
-        # 将 context 中的所有键值对作为独立的参数传递给模板
         output = template.render(**context)
         with open(html_dir, 'w', encoding='UTF-8') as f:
             f.write(output)
@@ -180,7 +178,8 @@ class GMEEK:
             render_dict = self.blogBase.copy()
             start_index = page_num * page_size
             end_index = start_index + page_size
-            render_dict["postListJson"] = post_items[start_index:end_index]
+            paginated_posts = post_items[start_index:end_index]
+            render_dict["postListJson"] = paginated_posts
 
             if page_num == 0:
                 html_path = f"{self.root_dir}index.html"
@@ -196,7 +195,8 @@ class GMEEK:
             context = {
                 'blogBase': render_dict,
                 'i18n': self.i18n,
-                'IconList': IconBase
+                'IconList': IconBase,
+                'postListJson': paginated_posts # [关键修正] 明确将 postListJson 作为顶级变量传递
             }
             self.renderHtml('plist.html', context, html_path)
             print(f"Created list page: {html_path}")
@@ -385,9 +385,6 @@ class GMEEK:
             filename = f"{p.get_pinyin(tag)}.html"
             
             render_dict = self.blogBase.copy()
-            render_dict["current_tag_name"] = tag
-            render_dict["posts_for_tag"] = posts_for_this_tag
-            render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/{filename}"
             
             context = {
                 'blogBase': render_dict,
@@ -396,6 +393,8 @@ class GMEEK:
                 'current_tag_name': tag,
                 'posts_for_tag': posts_for_this_tag
             }
+            # [修正] canonicalUrl 应该在 context 内部的 blogBase 中
+            context['blogBase']['canonicalUrl'] = f"{self.blogBase['homeUrl']}/{filename}"
             self.renderHtml('tag_single.html', context, f"{self.root_dir}{filename}")
             print(f"Created single tag page: {filename}")
 
