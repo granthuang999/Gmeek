@@ -46,7 +46,6 @@ class GMEEK:
         self.backup_dir='backup/'
         self.post_dir=self.root_dir+self.post_folder
 
-        # 修正：使用新的 Auth 方法以避免 DeprecationWarning
         auth = Auth.Token(self.options.github_token)
         user = Github(auth=auth)
         self.repo = self.get_repo(user, options.repo_name)
@@ -60,7 +59,6 @@ class GMEEK:
         self.defaultConfig()
         
     def cleanFile(self):
-        # This function is from your original file, kept for local runs if needed.
         workspace_path = os.environ.get('GITHUB_WORKSPACE', '.')
         if os.path.exists(os.path.join(workspace_path, self.backup_dir)):
             shutil.rmtree(os.path.join(workspace_path, self.backup_dir))
@@ -118,7 +116,6 @@ class GMEEK:
         env = Environment(loader=file_loader)
         env.filters['tojson'] = json.dumps
         template = env.get_template(template)
-        # Pass postListJson separately for plist.html compatibility
         postListJson = render_dict.get("postListJson", {})
         output = template.render(blogBase=render_dict, postListJson=postListJson, i18n=self.i18n, IconList=icon or IconBase)
         with open(htmlDir, 'w', encoding='UTF-8') as f:
@@ -142,7 +139,6 @@ class GMEEK:
         if issue_data["labels"][0] in self.blogBase["singlePage"]:
             render_dict["bottomText"]=''
 
-        # [还原] 恢复您原来版本中关于代码高亮检测和图标加载的逻辑
         if '<pre class="notranslate">' in render_dict["postBody"]:
             keys=['sun','moon','sync','home','github','copy','check']
             if '<div class="highlight' in render_dict["postBody"]:
@@ -194,7 +190,6 @@ class GMEEK:
         print("Created tag.html")
         
     def addOnePostJson(self, issue):
-        # [已包含] 这是移除JSON块的最新版本
         postConfig = {}
         body_content = issue.body or ""
 
@@ -204,7 +199,11 @@ class GMEEK:
             if last_meaningful_line.startswith("##{") and last_meaningful_line.endswith("}"):
                 try:
                     postConfig = json.loads(last_meaningful_line[2:])
-                    body_content = body_content.rstrip().removesuffix(last_meaningful_line.strip())
+                    # [修正] 使用兼容Python 3.8的方式移除末尾字符串
+                    suffix_to_remove = last_meaningful_line.strip()
+                    cleaned_body = body_content.rstrip()
+                    if cleaned_body.endswith(suffix_to_remove):
+                        body_content = cleaned_body[:-len(suffix_to_remove)]
                 except json.JSONDecodeError:
                     postConfig = {}
 
@@ -308,10 +307,19 @@ class GMEEK:
             item.description(item_data["description"])
             item.link(href=item_data["postUrl"])
             item.pubDate(datetime.datetime.fromtimestamp(item_data["createdAt"], tz=datetime.timezone.utc))
+            
+            # [关键新增] 添加文章图片到RSS item
+            if item_data.get("ogImage"):
+                image_url = item_data["ogImage"]
+                mime_type = 'image/jpeg'  # 默认MIME类型
+                if image_url.lower().endswith('.png'):
+                    mime_type = 'image/png'
+                elif image_url.lower().endswith('.gif'):
+                    mime_type = 'image/gif'
+                item.enclosure(url=image_url, length='0', type=mime_type)
         
         feed.rss_file(os.path.join(self.root_dir, 'rss.xml'), pretty=True)
 
-    # [修正] 修正缩进，使其作为 GMEEK 类的方法
     def runAll(self):
         print("====== start create static html ======")
         self.cleanFile()
@@ -335,7 +343,6 @@ class GMEEK:
         
         print("====== create static html end ======")
     
-    # [修正] 修正缩进，将其作为 GMEEK 类的方法
     def runOne(self, number_str):
         print(f"====== start create static html for issue {number_str} ======")
         issue = self.repo.get_issue(int(number_str))
@@ -381,7 +388,6 @@ if __name__ == '__main__':
     with open("blogBase.json", "w", encoding='utf-8') as f:
         json.dump(blog.blogBase, f, ensure_ascii=False, indent=2)
 
-    # Re-using your original logic for postList.json and README update
     print("====== create postList.json file ======")
     current_time = int(time.time())
     published_posts = {k: v for k, v in blog.blogBase["postListJson"].items() if v["createdAt"] <= current_time}
@@ -390,7 +396,6 @@ if __name__ == '__main__':
     commentNumSum=0
     wordCount=0
     for i in list(blog.blogBase["postListJson"].keys()):
-        # Pruning logic from your original file
         del blog.blogBase["postListJson"][i]["description"]
         del blog.blogBase["postListJson"][i]["postSourceUrl"]
         del blog.blogBase["postListJson"][i]["htmlDir"]
