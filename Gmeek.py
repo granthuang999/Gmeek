@@ -117,13 +117,15 @@ class GMEEK:
         except requests.RequestException as e:
             raise Exception(f"markdown2html error: {e}")
 
-    def renderHtml(self,template,render_dict,htmlDir,icon=None):
+    # [修正] 明确区分传递给模板的变量
+    def renderHtml(self,template_name, context, html_dir):
         file_loader = FileSystemLoader('templates')
         env = Environment(loader=file_loader)
         env.filters['tojson'] = json.dumps
-        template = env.get_template(template)
-        output = template.render(blogBase=render_dict, i18n=self.i18n, IconList=icon or IconBase)
-        with open(htmlDir, 'w', encoding='UTF-8') as f:
+        template = env.get_template(template_name)
+        # 将 context 中的所有键值对作为独立的参数传递给模板
+        output = template.render(**context)
+        with open(html_dir, 'w', encoding='UTF-8') as f:
             f.write(output)
 
     def createPostHtml(self, issue_data):
@@ -155,7 +157,13 @@ class GMEEK:
             render_dict["highlight"]=0
         
         postIcon=dict(zip(keys, map(IconBase.get, keys)))
-        self.renderHtml('post.html',render_dict,issue_data["htmlDir"],postIcon)
+        
+        context = {
+            'blogBase': render_dict,
+            'i18n': self.i18n,
+            'IconList': postIcon
+        }
+        self.renderHtml('post.html', context, issue_data["htmlDir"])
         print(f"Created page: title={issue_data['postTitle']}, file={issue_data['htmlDir']}")
 
     def createPlistHtml(self):
@@ -185,7 +193,12 @@ class GMEEK:
 
             render_dict["nextUrl"] = f"/page{page_num + 2}.html" if end_index < post_count else "disabled"
             
-            self.renderHtml('plist.html', render_dict, html_path)
+            context = {
+                'blogBase': render_dict,
+                'i18n': self.i18n,
+                'IconList': IconBase
+            }
+            self.renderHtml('plist.html', context, html_path)
             print(f"Created list page: {html_path}")
 
     def addOnePostJson(self, issue):
@@ -317,7 +330,6 @@ class GMEEK:
         
         feed.rss_file(os.path.join(self.root_dir, 'rss.xml'), pretty=True)
 
-    # [新增] 负责生成标签云页面
     def createTagCloudPage(self):
         print("====== create tag cloud page ======")
         all_posts = list(self.blogBase["postListJson"].values())
@@ -341,14 +353,18 @@ class GMEEK:
             max_count = max(info['count'] for info in tag_info.values())
 
         render_dict = self.blogBase.copy()
-        render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/tag.html"
         render_dict["tag_info"] = OrderedDict(sorted(tag_info.items()))
         render_dict["maxTagsCount"] = max_count
         
-        self.renderHtml('tag.html', render_dict, f"{self.root_dir}tag.html")
+        context = {
+            'blogBase': render_dict,
+            'i18n': self.i18n,
+            'IconList': IconBase,
+            'tag_info': render_dict['tag_info']
+        }
+        self.renderHtml('tag.html', context, f"{self.root_dir}tag.html")
         print("Created tag.html (Cloud Page)")
         
-    # [新增] 负责生成所有独立的标签页面
     def createTagPages(self):
         print("====== create single tag pages ======")
         all_posts = list(self.blogBase["postListJson"].values())
@@ -373,7 +389,14 @@ class GMEEK:
             render_dict["posts_for_tag"] = posts_for_this_tag
             render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/{filename}"
             
-            self.renderHtml('tag_single.html', render_dict, f"{self.root_dir}{filename}")
+            context = {
+                'blogBase': render_dict,
+                'i18n': self.i18n,
+                'IconList': IconBase,
+                'current_tag_name': tag,
+                'posts_for_tag': posts_for_this_tag
+            }
+            self.renderHtml('tag_single.html', context, f"{self.root_dir}{filename}")
             print(f"Created single tag page: {filename}")
 
     def runAll(self):
@@ -394,7 +417,12 @@ class GMEEK:
         
         pansou_render_dict = self.blogBase.copy()
         pansou_render_dict["canonicalUrl"] = f"{self.blogBase['homeUrl']}/pansou.html"
-        self.renderHtml('pansou.html', pansou_render_dict, f"{self.root_dir}pansou.html")
+        context = {
+            'blogBase': pansou_render_dict,
+            'i18n': self.i18n,
+            'IconList': IconBase
+        }
+        self.renderHtml('pansou.html', context, f"{self.root_dir}pansou.html")
         print("Created pansou.html")
         
         self.createFeedXml()
@@ -405,7 +433,10 @@ class GMEEK:
         print(f"====== start create static html for issue {number_str} ======")
         issue = self.repo.get_issue(int(number_str))
         if issue.state == "open":
-            self.addOnePostJson(issue)
+            # [修正] 确保即使在runOne中，基础数据也能被完全加载
+            issues = self.repo.get_issues(state='open')
+            for i in issues:
+                self.addOnePostJson(i)
             
             label_name = issue.labels[0].name if issue.labels else ""
             is_single_page = label_name in self.blogBase["singlePage"] or label_name in self.blogBase["hiddenPage"]
